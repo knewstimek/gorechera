@@ -95,6 +95,43 @@ func TestToolStartJobAcceptsExistingWorkspace(t *testing.T) {
 	waitForJobStatus(t, service, job.ID, domain.JobStatusBlocked)
 }
 
+func TestToolStartJobRejectsRelativeWorkspaceBeforeExecution(t *testing.T) {
+	t.Parallel()
+
+	server, service, root := newTestServer(t, mock.New())
+
+	resp := server.handleToolCall(mustToolCallRequest(t, "gorechera_start_job", map[string]any{
+		"goal":          "Reject relative MCP workspace",
+		"provider":      string(domain.ProviderMock),
+		"workspace_dir": "relative\\workspace",
+	}))
+	if resp == nil {
+		t.Fatal("expected response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("expected MCP text error result, got rpc error %#v", resp.Error)
+	}
+
+	result, ok := resp.Result.(toolResult)
+	if !ok {
+		t.Fatalf("expected toolResult, got %T", resp.Result)
+	}
+	text := toolResultText(t, result)
+	if !strings.Contains(text, "workspace directory must be an absolute path") {
+		t.Fatalf("expected relative workspace error, got %q", text)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(root, "state", "jobs")); !os.IsNotExist(statErr) {
+		t.Fatalf("expected no persisted jobs, stat err=%v", statErr)
+	}
+
+	select {
+	case event := <-service.EventChan():
+		t.Fatalf("expected no events for rejected MCP start, got %#v", event)
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
 func newTestServer(t *testing.T, adapters ...provider.Adapter) (*Server, *orchestrator.Service, string) {
 	t.Helper()
 

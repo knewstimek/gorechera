@@ -307,6 +307,7 @@ type Job struct {
 	PendingApproval         *PendingApproval      `json:"pending_approval,omitempty"`
 	Summary                 string                `json:"summary,omitempty"`
 	LeaderContextSummary    string                `json:"leader_context_summary,omitempty"`
+	SupervisorDirective     string                `json:"supervisor_directive,omitempty"`
 	TokenUsage              TokenUsage            `json:"token_usage"`
 	Steps                   []Step                `json:"steps,omitempty"`
 	Events                  []Event               `json:"events,omitempty"`

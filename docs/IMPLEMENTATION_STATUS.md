@@ -25,6 +25,16 @@ All known bugs have been fixed (2026-04-02, TOCTOU fixed separately).
 | BUG-4: phase parameter discarded | Removed unused phase parameter from runPhase and call sites | provider.go |
 | BUG-5: verificationSatisfied string matching | Removed fragile strings.Contains check; now checks artifact + summary presence | verification.go |
 
+### Audit Fixes (2026-04-02)
+
+| Finding | Resolution | Files changed |
+|---------|------------|---------------|
+| completionRetryPending summarize cleanup | `summarize` now clears stale `blocked_reason` during completion retry, and the no-new-steps `complete` retry return now touches and persists job state before exit | service.go, service_test.go |
+| classifyWorkerFailure validator detection | Worker failure classification now treats validator-style messages such as `is required`, `invalid`, and `validation failed` as schema violations | service.go, service_test.go |
+| Minimal mode step counting | Minimal context payload now reports `blocked_steps` separately and only counts empty/`active` statuses as active | protocol.go, provider_test.go |
+| Summary mode UTF-8 truncation | Summary payload truncation now slices by rune instead of bytes to avoid splitting multibyte UTF-8 text | protocol.go, provider_test.go |
+| Parallel worker failed-status recovery | Parallel fan-out keeps the job running when a worker returns `status="failed"`, marks that step failed, and hands control back to the leader like the single-worker path | parallel.go, service_test.go |
+
 ### New Bugs Found
 
 | Bug | Description | Severity | Status |

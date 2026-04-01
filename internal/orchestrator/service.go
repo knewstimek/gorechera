@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -101,24 +100,6 @@ func (s *Service) EventChan() <-chan EventNotification {
 	return s.eventChan
 }
 
-func validateWorkspaceDir(path string) error {
-	if strings.TrimSpace(path) == "" {
-		return nil
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("workspace directory does not exist: %s", path)
-		}
-		return fmt.Errorf("stat workspace directory %q: %w", path, err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("workspace directory does not exist: %s", path)
-	}
-	return nil
-}
-
 func (s *Service) Start(ctx context.Context, input CreateJobInput) (*domain.Job, error) {
 	now := time.Now().UTC()
 	if input.MaxSteps <= 0 {
@@ -145,7 +126,7 @@ func (s *Service) Start(ctx context.Context, input CreateJobInput) (*domain.Job,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
-	if err := validateWorkspaceDir(job.WorkspaceDir); err != nil {
+	if err := ValidateWorkspaceDir(job.WorkspaceDir); err != nil {
 		return nil, err
 	}
 	job.LeaderContextSummary = fmt.Sprintf("Goal: %s", job.Goal)
@@ -186,7 +167,7 @@ func (s *Service) StartAsync(ctx context.Context, input CreateJobInput) (*domain
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
-	if err := validateWorkspaceDir(job.WorkspaceDir); err != nil {
+	if err := ValidateWorkspaceDir(job.WorkspaceDir); err != nil {
 		return nil, err
 	}
 	job.LeaderContextSummary = fmt.Sprintf("Goal: %s", job.Goal)
@@ -499,6 +480,7 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 			return s.failJob(ctx, job, fmt.Sprintf("leader execution failed: %v", err))
 		}
 		s.accumulateTokenUsage(job, job.CurrentStep, estimateProviderUsage(rawLeader, *job))
+		job.SupervisorDirective = ""
 
 		var leader domain.LeaderOutput
 		if err := json.Unmarshal([]byte(rawLeader), &leader); err != nil {
@@ -555,6 +537,10 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 				return job, nil
 			}
 		case "summarize":
+			if completionRetryPending {
+				job.BlockedReason = ""
+				completionRetryPending = false
+			}
 			job.Summary = leader.Reason
 			job.LeaderContextSummary = leader.NextHint
 			s.addEvent(job, "leader_summary", "leader emitted a summary")
@@ -565,6 +551,10 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 		case "complete":
 			if completionRetryPending && len(job.Steps) == completionRetryStepCount {
 				job.Status = domain.JobStatusBlocked
+				s.touch(job)
+				if err := s.state.SaveJob(ctx, job); err != nil {
+					return nil, err
+				}
 				return job, nil
 			}
 			report, err := s.evaluateCompletion(ctx, job)
@@ -725,6 +715,7 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 	}
 
 	job.LeaderContextSummary = worker.Summary
+	job.LeaderContextSummary = sanitizeLeaderContext(job.LeaderContextSummary)
 	s.touch(job)
 	return s.state.SaveJob(ctx, job)
 }
@@ -822,6 +813,7 @@ func (s *Service) runSystemStepWithApproval(ctx context.Context, job *domain.Job
 	}
 
 	job.LeaderContextSummary = last.Summary
+	job.LeaderContextSummary = sanitizeLeaderContext(job.LeaderContextSummary)
 	s.touch(job)
 	return s.state.SaveJob(ctx, job)
 }
@@ -850,7 +842,7 @@ func (s *Service) blockJobWithEvent(ctx context.Context, job *domain.Job, eventK
 	job.Status = domain.JobStatusBlocked
 	job.BlockedReason = reason
 	job.FailureReason = ""
-	job.LeaderContextSummary = reason
+	job.LeaderContextSummary = sanitizeLeaderContext(reason)
 	s.addEvent(job, eventKind, reason)
 	s.touch(job)
 	if err := s.state.SaveJob(ctx, job); err != nil {
@@ -952,12 +944,12 @@ func (s *Service) Steer(ctx context.Context, jobID string, message string) (*dom
 	if err != nil {
 		return nil, err
 	}
-	directive := "[SUPERVISOR] " + strings.TrimSpace(message)
-	if strings.TrimSpace(job.LeaderContextSummary) != "" {
-		job.LeaderContextSummary = directive + "\n\n" + job.LeaderContextSummary
-	} else {
-		job.LeaderContextSummary = directive
+	switch job.Status {
+	case domain.JobStatusRunning, domain.JobStatusWaitingLeader, domain.JobStatusWaitingWorker:
+	default:
+		return job, fmt.Errorf("cannot steer job with status %s", job.Status)
 	}
+	job.SupervisorDirective = "[SUPERVISOR] " + strings.TrimSpace(message)
 	s.addEvent(job, "supervisor_steer", message)
 	s.touch(job)
 	if err := s.state.SaveJob(ctx, job); err != nil {
@@ -1016,6 +1008,21 @@ func blockedReasonStrikeCount(job *domain.Job, reason string) int {
 	return count
 }
 
+func sanitizeLeaderContext(text string) string {
+	if text == "" {
+		return ""
+	}
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	filtered := lines[:0]
+	for _, line := range lines {
+		if strings.HasPrefix(line, "[SUPERVISOR]") {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	return strings.Join(filtered, "\n")
+}
+
 type workerFailureEventMessage struct {
 	Reason           string                   `json:"reason"`
 	StructuredReason *domain.StructuredReason `json:"structured_reason"`
@@ -1038,7 +1045,12 @@ func classifyWorkerFailure(err error, workerOutput string) *domain.StructuredRea
 			Detail:          firstNonEmpty(detail, "worker execution timed out"),
 			SuggestedAction: "increase_timeout",
 		}
-	case isJSONUnmarshalError(err) || strings.Contains(combined, "json unmarshal") || strings.Contains(combined, "schema validation"):
+	case isJSONUnmarshalError(err) ||
+		strings.Contains(combined, "json unmarshal") ||
+		strings.Contains(combined, "schema validation") ||
+		strings.Contains(combined, "is required") ||
+		strings.Contains(combined, "invalid") ||
+		strings.Contains(combined, "validation failed"):
 		return &domain.StructuredReason{
 			Category:        "schema_violation",
 			Detail:          firstNonEmpty(detail, "worker output schema violation"),

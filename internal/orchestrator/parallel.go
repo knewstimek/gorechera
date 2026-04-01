@@ -314,7 +314,7 @@ func (s *Service) runParallelWorkerPlans(ctx context.Context, job *domain.Job, p
 		s.addEvent(job, "parallel_workers_blocked", blockedReason)
 	case failedReason != "":
 		if overallStatus != domain.JobStatusFailed {
-			overallStatus = domain.JobStatusFailed
+			overallStatus = domain.JobStatusRunning
 		}
 		job.FailureReason = failedReason
 		job.BlockedReason = ""

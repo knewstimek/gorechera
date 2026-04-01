@@ -215,6 +215,10 @@ func buildLeaderPrompt(job domain.Job) string {
 	payload := buildLeaderJobPayload(job)
 	contractPayload := "{}"
 	strictnessLevel := strings.TrimSpace(job.StrictnessLevel)
+	supervisorSection := ""
+	if strings.TrimSpace(job.SupervisorDirective) != "" {
+		supervisorSection = fmt.Sprintf("Supervisor directive:\n%s\n\n", job.SupervisorDirective)
+	}
 	if strings.TrimSpace(job.SprintContractRef) != "" {
 		if data, err := os.ReadFile(job.SprintContractRef); err == nil {
 			contractPayload = string(data)
@@ -240,7 +244,7 @@ func buildLeaderPrompt(job domain.Job) string {
 		)
 	}
 	return strings.TrimSpace(fmt.Sprintf(`
-TASK: You are a leader component operating under an orchestrator supervisor. The supervisor agent monitors your decisions via MCP tools and may inject [SUPERVISOR] directives into the leader context. You coordinate workers (executor, reviewer, tester) but do not perform implementation yourself.
+TASK: You are a leader component operating under an orchestrator supervisor. The supervisor agent monitors your decisions via MCP tools and may inject [SUPERVISOR] directives as a separate supervisor directive. You coordinate workers (executor, reviewer, tester) but do not perform implementation yourself.
 The job data below is complete. Decide and output the next action now -- do not ask for input.
 Output only a JSON object matching the schema. No conversation, no preamble.
 
@@ -267,20 +271,21 @@ For complete/fail/blocked: set action, reason=explanation
 
 %s
 
-Current job state:
+%sCurrent job state:
 %s
 
 Sprint contract:
 %s
-If the leader context contains a [SUPERVISOR] directive, follow it with highest priority.
+If the supervisor directive section is present, follow it with highest priority.
 Supervisor directives override previous plans.
 
-`, job.Goal, strings.Join(completionRules, "\n"), payload, contractPayload))
+`, job.Goal, strings.Join(completionRules, "\n"), supervisorSection, payload, contractPayload))
 }
 
 // buildLeaderJobPayload serializes the job state for the leader prompt,
 // respecting the job's ContextMode setting to control payload size.
 func buildLeaderJobPayload(job domain.Job) string {
+	job.SupervisorDirective = ""
 	mode := strings.TrimSpace(strings.ToLower(job.ContextMode))
 	if mode == "" {
 		mode = "full"
@@ -325,8 +330,8 @@ func buildSummaryPayload(job domain.Job) string {
 			ss.TaskText = s.TaskText
 		} else {
 			summary := s.Summary
-			if len(summary) > 80 {
-				summary = summary[:80] + "..."
+			if len([]rune(summary)) > 80 {
+				summary = string([]rune(summary)[:80]) + "..."
 			}
 			ss.Summary = summary
 		}
@@ -349,14 +354,16 @@ func buildSummaryPayload(job domain.Job) string {
 }
 
 func buildMinimalPayload(job domain.Job) string {
-	succeeded, failed, active := 0, 0, 0
+	succeeded, failed, blocked, active := 0, 0, 0, 0
 	for _, s := range job.Steps {
 		switch s.Status {
 		case domain.StepStatusSucceeded:
 			succeeded++
 		case domain.StepStatusFailed:
 			failed++
-		default:
+		case domain.StepStatusBlocked:
+			blocked++
+		case "", domain.StepStatusActive:
 			active++
 		}
 	}
@@ -378,6 +385,7 @@ func buildMinimalPayload(job domain.Job) string {
 		MaxSteps             int          `json:"max_steps"`
 		SucceededSteps       int          `json:"succeeded_steps"`
 		FailedSteps          int          `json:"failed_steps"`
+		BlockedSteps         int          `json:"blocked_steps"`
 		ActiveSteps          int          `json:"active_steps"`
 		LastStep             *minimalStep `json:"last_step,omitempty"`
 	}
@@ -392,6 +400,7 @@ func buildMinimalPayload(job domain.Job) string {
 		MaxSteps:             job.MaxSteps,
 		SucceededSteps:       succeeded,
 		FailedSteps:          failed,
+		BlockedSteps:         blocked,
 		ActiveSteps:          active,
 	}
 	if len(job.Steps) > 0 {

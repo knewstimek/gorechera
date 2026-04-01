@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"gorechera/internal/domain"
 	"gorechera/internal/provider/mock"
@@ -296,6 +297,31 @@ func TestLeaderPromptIncludesRunWorkersGuidance(t *testing.T) {
 	}
 }
 
+func TestLeaderPromptIncludesSupervisorDirectiveBeforeJobState(t *testing.T) {
+	t.Parallel()
+
+	prompt := buildLeaderPrompt(domain.Job{
+		Goal:                "Honor the supervisor directive",
+		Provider:            domain.ProviderMock,
+		SupervisorDirective: "[SUPERVISOR] prioritize the audit fix",
+	})
+
+	supervisorIdx := strings.Index(prompt, "Supervisor directive:\n[SUPERVISOR] prioritize the audit fix")
+	if supervisorIdx < 0 {
+		t.Fatal("expected separate supervisor directive section")
+	}
+	jobStateIdx := strings.Index(prompt, "Current job state:")
+	if jobStateIdx < 0 {
+		t.Fatal("expected current job state section")
+	}
+	if supervisorIdx > jobStateIdx {
+		t.Fatal("expected supervisor directive before job state")
+	}
+	if strings.Count(prompt, "[SUPERVISOR] prioritize the audit fix") != 1 {
+		t.Fatal("expected supervisor directive to appear only once in the prompt")
+	}
+}
+
 func TestMockPlannerProducesVerificationContract(t *testing.T) {
 	t.Parallel()
 
@@ -339,6 +365,79 @@ func TestMockLeaderProducesRunWorkersForParallelGoal(t *testing.T) {
 	}
 	if err := schema.ValidateLeaderOutput(leader); err != nil {
 		t.Fatalf("expected run_workers leader output to validate: %v", err)
+	}
+}
+
+func TestBuildMinimalPayloadCountsBlockedFailedAndActiveStepsSeparately(t *testing.T) {
+	t.Parallel()
+
+	payload := buildMinimalPayload(domain.Job{
+		Goal: "Count step states",
+		Steps: []domain.Step{
+			{Index: 1, TaskType: "implement", Status: ""},
+			{Index: 2, TaskType: "review", Status: domain.StepStatusActive},
+			{Index: 3, TaskType: "review", Status: domain.StepStatusBlocked},
+			{Index: 4, TaskType: "test", Status: domain.StepStatusFailed},
+			{Index: 5, TaskType: "test", Status: domain.StepStatusPending},
+			{Index: 6, TaskType: "test", Status: domain.StepStatusSucceeded},
+		},
+	})
+
+	var out struct {
+		SucceededSteps int `json:"succeeded_steps"`
+		FailedSteps    int `json:"failed_steps"`
+		BlockedSteps   int `json:"blocked_steps"`
+		ActiveSteps    int `json:"active_steps"`
+	}
+	if err := json.Unmarshal([]byte(payload), &out); err != nil {
+		t.Fatalf("failed to decode minimal payload: %v", err)
+	}
+
+	if out.SucceededSteps != 1 {
+		t.Fatalf("expected 1 succeeded step, got %d", out.SucceededSteps)
+	}
+	if out.FailedSteps != 1 {
+		t.Fatalf("expected 1 failed step, got %d", out.FailedSteps)
+	}
+	if out.BlockedSteps != 1 {
+		t.Fatalf("expected 1 blocked step, got %d", out.BlockedSteps)
+	}
+	if out.ActiveSteps != 2 {
+		t.Fatalf("expected only empty-status and active steps to count as active, got %d", out.ActiveSteps)
+	}
+}
+
+func TestBuildSummaryPayloadTruncatesSummariesOnRuneBoundaries(t *testing.T) {
+	t.Parallel()
+
+	longSummary := strings.Repeat("가", 81)
+	payload := buildSummaryPayload(domain.Job{
+		Goal: "Truncate multibyte summaries safely",
+		Steps: []domain.Step{
+			{Index: 1, TaskType: "implement", Status: domain.StepStatusSucceeded, Summary: longSummary},
+			{Index: 2, TaskType: "review", Status: domain.StepStatusSucceeded, Summary: "reviewed"},
+			{Index: 3, TaskType: "test", Status: domain.StepStatusSucceeded, Summary: "tested"},
+		},
+	})
+
+	var out struct {
+		Steps []struct {
+			Summary string `json:"summary"`
+		} `json:"steps"`
+	}
+	if err := json.Unmarshal([]byte(payload), &out); err != nil {
+		t.Fatalf("failed to decode summary payload: %v", err)
+	}
+	if len(out.Steps) != 3 {
+		t.Fatalf("expected 3 steps, got %d", len(out.Steps))
+	}
+
+	want := strings.Repeat("가", 80) + "..."
+	if out.Steps[0].Summary != want {
+		t.Fatalf("expected rune-safe truncation %q, got %q", want, out.Steps[0].Summary)
+	}
+	if !utf8.ValidString(out.Steps[0].Summary) {
+		t.Fatalf("expected valid utf-8 summary, got %q", out.Steps[0].Summary)
 	}
 }
 

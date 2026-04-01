@@ -141,24 +141,6 @@ type toolResult struct {
 	Content []contentItem `json:"content"`
 }
 
-func validateWorkspaceDir(path string) error {
-	if strings.TrimSpace(path) == "" {
-		return nil
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("workspace directory does not exist: %s", path)
-		}
-		return fmt.Errorf("failed to access workspace directory %q: %w", path, err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("workspace directory does not exist: %s", path)
-	}
-	return nil
-}
-
 // ---- Routing ---------------------------------------------------------------
 
 func (s *Server) handleMessage(raw []byte) *jsonRPCResponse {
@@ -411,7 +393,7 @@ func (s *Server) toolStartJob(ctx context.Context, args map[string]any) (toolRes
 	maxSteps := intArgDefault(args, "max_steps", 8)
 	strictnessLevel := stringArgDefault(args, "strictness_level", "normal")
 	contextMode := stringArgDefault(args, "context_mode", "full")
-	if err := validateWorkspaceDir(workspaceDir); err != nil {
+	if err := orchestrator.ValidateWorkspaceDir(workspaceDir); err != nil {
 		return toolResult{}, err
 	}
 
@@ -660,5 +642,6 @@ func (s *Server) toolSteer(ctx context.Context, args map[string]any) (toolResult
 	return jsonResult(map[string]any{
 		"status":                 "steered",
 		"leader_context_summary": job.LeaderContextSummary,
+		"supervisor_directive":   job.SupervisorDirective,
 	})
 }
