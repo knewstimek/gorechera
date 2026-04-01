@@ -213,6 +213,31 @@ Verification contract:
 
 func buildLeaderPrompt(job domain.Job) string {
 	payload, _ := json.MarshalIndent(job, "", "  ")
+	contractPayload := "{}"
+	strictnessLevel := strings.TrimSpace(job.StrictnessLevel)
+	if strings.TrimSpace(job.SprintContractRef) != "" {
+		if data, err := os.ReadFile(job.SprintContractRef); err == nil {
+			contractPayload = string(data)
+			var sprint domain.SprintContract
+			if err := json.Unmarshal(data, &sprint); err == nil && strings.TrimSpace(sprint.StrictnessLevel) != "" {
+				strictnessLevel = strings.TrimSpace(sprint.StrictnessLevel)
+			}
+		}
+	}
+	completionRules := []string{
+		`Completion rules:`,
+		`- Use action="complete" only when the sprint contract is satisfied and the goal is fully achieved.`,
+		`- If required step coverage is missing, dispatch the missing work instead of choosing complete.`,
+	}
+	if strings.EqualFold(strictnessLevel, "strict") {
+		// Strict mode uses the sprint contract as a gate, so the leader must
+		// schedule each required worker phase before attempting completion.
+		completionRules = append(completionRules,
+			`- Strict mode is active. Before action="complete", you MUST dispatch and obtain succeeded worker steps for implement, then review, then test.`,
+			`- In strict mode, review must happen after implement succeeds, and test must happen after review succeeds.`,
+			`- If implement, review, or test is missing or not succeeded yet, choose run_worker or run_workers for the next required stage instead of complete.`,
+		)
+	}
 	return strings.TrimSpace(fmt.Sprintf(`
 TASK: You are a leader component in an automated orchestration engine.
 The job data below is complete. Decide and output the next action now -- do not ask for input.
@@ -239,9 +264,14 @@ For run_system: set action="run_system", target="SYS", task_type=one of "build"/
 For summarize: set action="summarize", reason=summary text
 For complete/fail/blocked: set action, reason=explanation
 
+%s
+
 Current job state:
 %s
-`, job.Goal, string(payload)))
+
+Sprint contract:
+%s
+`, job.Goal, strings.Join(completionRules, "\n"), string(payload), contractPayload))
 }
 
 func buildWorkerPrompt(job domain.Job, task domain.LeaderOutput) string {

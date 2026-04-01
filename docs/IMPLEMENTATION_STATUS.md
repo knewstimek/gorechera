@@ -54,7 +54,13 @@ All known bugs have been fixed (2026-04-02, TOCTOU fixed separately).
 - Verification contract surface (read-only, derived from sprint contract + evaluator evidence)
 - Pending approval state for blocked system actions + operator approve/reject
 - Worker artifact real content storage via FileContents field
-- Normal strictness evaluator gate: `implement` required, `review` optional, verification satisfied by succeeded `test`/`build`/`command`
+- Normal strictness evaluator gate: `implement` required, `review` optional, rule-based override for provider blocked
+- Claude adapter real integration (planner/leader/worker confirmed, --permission-mode dontAsk, --json-schema, stdin prompt)
+- Codex adapter real integration (GPT full pipeline done convergence achieved, stdin prompt, workspace-write sandbox)
+- MCP server (JSON-RPC 2.0 stdio, 10 tools, notification support)
+- Evaluator strictness 3 levels (strict/normal/lenient) with per-level verification rules
+- TOCTOU fix: atomic harness ownership via claimHarness/releaseHarnessClaim + harnessInflight map
+- Normal mode done convergence: GPT-only pipeline ~89 seconds end-to-end
 
 ## Not Implemented
 
@@ -62,8 +68,8 @@ All known bugs have been fixed (2026-04-02, TOCTOU fixed separately).
 
 | Item | Spec ref | Current state |
 |------|----------|---------------|
-| Claude adapter (real) | spec:102-106 | CLI wrapper scaffolding only (claude.go). Calls `claude --bare -p --permission-mode dontAsk --json-schema`. Not tested against real CLI. |
-| Codex adapter (real) | spec:102-106 | CLI wrapper scaffolding only (codex.go). Calls `codex exec --output-schema`. Not tested. |
+| Claude adapter (real) | spec:102-106 | **Done.** Real integration with --permission-mode dontAsk, --json-schema, --output-format json, stdin prompt, per-role model selection. |
+| Codex adapter (real) | spec:102-106 | **Done.** Real integration with codex exec, --output-schema, workspace-write sandbox, stdin prompt. Full pipeline done convergence confirmed. |
 | Error classification (10 types) | spec:419-432 | Only 5 types: missing_executable, probe_failed, command_failed, invalid_response, unsupported_phase. Missing: auth, quota, rate_limit, billing, session_expired, network, transport. |
 | Error-specific retry/block policy | spec:433-478 | None. All errors result in simple fail. |
 

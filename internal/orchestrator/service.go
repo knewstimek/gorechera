@@ -77,7 +77,7 @@ func NewService(sessions *provider.SessionManager, state *store.StateStore, arti
 		workspaceRoot: workspaceRoot,
 		// Buffer 100 notifications so that burst events during a fast-running job
 		// do not stall the orchestrator goroutine even if the MCP listener lags.
-		eventChan:     make(chan EventNotification, 100),
+		eventChan:       make(chan EventNotification, 100),
 		harnesses:       make(map[int]runtimeexec.ProcessHandle),
 		harnessOwners:   make(map[int]string),
 		jobHarnesses:    make(map[string]map[int]struct{}),
@@ -436,12 +436,21 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 		}
 	}
 
+	leaderRetryPending := false
+	completionRetryPending := false
+	completionRetryStepCount := 0
 	for job.CurrentStep < job.MaxSteps {
 		job.Status = domain.JobStatusWaitingLeader
 		s.touch(job)
 		s.addEvent(job, "leader_requested", "requesting leader action")
-		if err := s.state.SaveJob(ctx, job); err != nil {
-			return nil, err
+		if !leaderRetryPending {
+			if err := s.state.SaveJob(ctx, job); err != nil {
+				return nil, err
+			}
+		} else {
+			// The evaluator already persisted the blocked gate result. Avoid an
+			// immediate second save before the retrying leader turn on Windows.
+			leaderRetryPending = false
 		}
 
 		rawLeader, err := s.sessions.RunLeader(ctx, *job)
@@ -459,6 +468,10 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 
 		switch leader.Action {
 		case "run_worker":
+			if completionRetryPending {
+				job.BlockedReason = ""
+				completionRetryPending = false
+			}
 			if err := s.runWorkerStep(ctx, job, leader); err != nil {
 				return nil, err
 			}
@@ -466,6 +479,10 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 				return job, nil
 			}
 		case "run_workers":
+			if completionRetryPending {
+				job.BlockedReason = ""
+				completionRetryPending = false
+			}
 			if err := s.runWorkerStep(ctx, job, leader); err != nil {
 				return nil, err
 			}
@@ -473,6 +490,10 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 				return job, nil
 			}
 		case "run_system":
+			if completionRetryPending {
+				job.BlockedReason = ""
+				completionRetryPending = false
+			}
 			if err := s.runSystemStep(ctx, job, leader); err != nil {
 				return nil, err
 			}
@@ -488,11 +509,23 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 				return nil, err
 			}
 		case "complete":
+			if completionRetryPending && len(job.Steps) == completionRetryStepCount {
+				job.Status = domain.JobStatusBlocked
+				return job, nil
+			}
 			report, err := s.evaluateCompletion(ctx, job)
 			if err != nil {
 				return nil, err
 			}
 			if !report.Passed {
+				// An evaluator "blocked" result means the job is recoverable if the
+				// leader schedules the missing work, so keep the loop alive.
+				if report.Status == "blocked" {
+					completionRetryPending = true
+					completionRetryStepCount = len(job.Steps)
+					leaderRetryPending = true
+					continue
+				}
 				return job, nil
 			}
 			job.Status = domain.JobStatusDone
