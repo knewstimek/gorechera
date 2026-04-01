@@ -228,6 +228,7 @@ func buildLeaderPrompt(job domain.Job) string {
 		`Completion rules:`,
 		`- Use action="complete" only when the sprint contract is satisfied and the goal is fully achieved.`,
 		`- If required step coverage is missing, dispatch the missing work instead of choosing complete.`,
+		`- Do NOT use summarize as a substitute for complete. Summarize is only for recording intermediate progress between worker dispatches. If all required work is done and verified, choose complete immediately. Do not summarize more than once consecutively.`,
 	}
 	if strings.EqualFold(strictnessLevel, "strict") {
 		// Strict mode uses the sprint contract as a gate, so the leader must

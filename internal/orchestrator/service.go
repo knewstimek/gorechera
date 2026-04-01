@@ -474,6 +474,7 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 	leaderRetryPending := false
 	completionRetryPending := false
 	completionRetryStepCount := 0
+	consecutiveSummarizes := 0
 	for job.CurrentStep < job.MaxSteps {
 		job.Status = domain.JobStatusWaitingLeader
 		s.touch(job)
@@ -505,6 +506,18 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 		}
 		if err := schema.ValidateLeaderOutput(leader); err != nil {
 			return s.failJob(ctx, job, fmt.Sprintf("leader schema validation failed: %v", err))
+		}
+
+		if leader.Action == "summarize" {
+			if consecutiveSummarizes >= 2 {
+				s.addEvent(job, "leader_summarize_capped", "leader summarize capped; forcing completion evaluation")
+				leader.Action = "complete"
+				consecutiveSummarizes = 0
+			} else {
+				consecutiveSummarizes++
+			}
+		} else {
+			consecutiveSummarizes = 0
 		}
 
 		switch leader.Action {
