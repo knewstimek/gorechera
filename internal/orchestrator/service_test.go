@@ -73,6 +73,150 @@ func TestServiceStartCompletesMockLoop(t *testing.T) {
 	}
 }
 
+func TestServiceStartRejectsInvalidWorkspaceBeforePersistence(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	registry := provider.NewRegistry()
+	registry.Register(mock.New())
+
+	service := orchestrator.NewService(
+		provider.NewSessionManager(registry),
+		store.NewStateStore(filepath.Join(root, "state")),
+		store.NewArtifactStore(filepath.Join(root, "artifacts")),
+		root,
+	)
+
+	missingWorkspace := filepath.Join(root, "missing-workspace")
+	_, err := service.Start(context.Background(), orchestrator.CreateJobInput{
+		Goal:         "Reject an invalid workspace before persistence",
+		Provider:     domain.ProviderMock,
+		WorkspaceDir: missingWorkspace,
+		MaxSteps:     8,
+	})
+	if err == nil {
+		t.Fatal("expected invalid workspace error")
+	}
+	if !strings.Contains(err.Error(), "workspace directory does not exist: "+missingWorkspace) {
+		t.Fatalf("expected invalid workspace path in error, got %q", err)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(root, "state", "jobs")); !os.IsNotExist(statErr) {
+		t.Fatalf("expected no persisted jobs, stat err=%v", statErr)
+	}
+
+	select {
+	case event := <-service.EventChan():
+		t.Fatalf("expected no events for rejected start, got %#v", event)
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestServiceStartAsyncRejectsInvalidWorkspaceBeforePersistence(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	registry := provider.NewRegistry()
+	registry.Register(mock.New())
+
+	service := orchestrator.NewService(
+		provider.NewSessionManager(registry),
+		store.NewStateStore(filepath.Join(root, "state")),
+		store.NewArtifactStore(filepath.Join(root, "artifacts")),
+		root,
+	)
+
+	missingWorkspace := filepath.Join(root, "missing-workspace")
+	_, err := service.StartAsync(context.Background(), orchestrator.CreateJobInput{
+		Goal:         "Reject an invalid workspace before background execution",
+		Provider:     domain.ProviderMock,
+		WorkspaceDir: missingWorkspace,
+		MaxSteps:     8,
+	})
+	if err == nil {
+		t.Fatal("expected invalid workspace error")
+	}
+	if !strings.Contains(err.Error(), "workspace directory does not exist: "+missingWorkspace) {
+		t.Fatalf("expected invalid workspace path in error, got %q", err)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(root, "state", "jobs")); !os.IsNotExist(statErr) {
+		t.Fatalf("expected no persisted jobs, stat err=%v", statErr)
+	}
+
+	select {
+	case event := <-service.EventChan():
+		t.Fatalf("expected no events for rejected async start, got %#v", event)
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestServiceStartAsyncAcceptsExistingWorkspace(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	workspace := t.TempDir()
+	registry := provider.NewRegistry()
+	registry.Register(completeImmediatelyProvider{})
+
+	service := orchestrator.NewService(
+		provider.NewSessionManager(registry),
+		store.NewStateStore(filepath.Join(root, "state")),
+		store.NewArtifactStore(filepath.Join(root, "artifacts")),
+		root,
+	)
+
+	job, err := service.StartAsync(context.Background(), orchestrator.CreateJobInput{
+		Goal:         "Accept an existing workspace for async job creation",
+		Provider:     domain.ProviderName("complete-immediately"),
+		WorkspaceDir: workspace,
+		MaxSteps:     8,
+	})
+	if err != nil {
+		t.Fatalf("StartAsync returned error: %v", err)
+	}
+	if job.WorkspaceDir != workspace {
+		t.Fatalf("expected workspace dir %q, got %q", workspace, job.WorkspaceDir)
+	}
+
+	jobPath := filepath.Join(root, "state", "jobs", job.ID+".json")
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, statErr := os.Stat(jobPath); statErr == nil {
+			break
+		} else if !os.IsNotExist(statErr) {
+			t.Fatalf("expected persisted job file, got %v", statErr)
+		}
+
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for persisted job %q", jobPath)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	waitForJobStatus(t, service, job.ID, domain.JobStatusBlocked)
+}
+
+func waitForJobStatus(t *testing.T, service *orchestrator.Service, jobID string, want domain.JobStatus) {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		job, err := service.Get(context.Background(), jobID)
+		if err == nil && job.Status == want {
+			return
+		}
+
+		if time.Now().After(deadline) {
+			if err != nil {
+				t.Fatalf("timed out waiting for job %s: %v", jobID, err)
+			}
+			t.Fatalf("timed out waiting for job %s status %s, got %s", jobID, want, job.Status)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestServiceExecutesAllowedSystemAction(t *testing.T) {
 	t.Parallel()
 

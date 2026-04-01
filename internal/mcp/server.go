@@ -101,10 +101,10 @@ type jsonRPCRequest struct {
 }
 
 type jsonRPCResponse struct {
-	JSONRPC string     `json:"jsonrpc"`
-	ID      any        `json:"id,omitempty"`
-	Result  any        `json:"result,omitempty"`
-	Error   *rpcError  `json:"error,omitempty"`
+	JSONRPC string    `json:"jsonrpc"`
+	ID      any       `json:"id,omitempty"`
+	Result  any       `json:"result,omitempty"`
+	Error   *rpcError `json:"error,omitempty"`
 }
 
 type rpcError struct {
@@ -115,9 +115,9 @@ type rpcError struct {
 // ---- MCP schema types ------------------------------------------------------
 
 type toolInputSchema struct {
-	Type       string                    `json:"type"`
-	Properties map[string]schemaProp     `json:"properties,omitempty"`
-	Required   []string                  `json:"required,omitempty"`
+	Type       string                `json:"type"`
+	Properties map[string]schemaProp `json:"properties,omitempty"`
+	Required   []string              `json:"required,omitempty"`
 }
 
 type schemaProp struct {
@@ -139,6 +139,24 @@ type contentItem struct {
 
 type toolResult struct {
 	Content []contentItem `json:"content"`
+}
+
+func validateWorkspaceDir(path string) error {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("workspace directory does not exist: %s", path)
+		}
+		return fmt.Errorf("failed to access workspace directory %q: %w", path, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("workspace directory does not exist: %s", path)
+	}
+	return nil
 }
 
 // ---- Routing ---------------------------------------------------------------
@@ -180,7 +198,7 @@ func (s *Server) handleInitialize(req jsonRPCRequest) *jsonRPCResponse {
 			"version": "1.0.0",
 		},
 		"capabilities": map[string]any{
-			"tools":   map[string]any{},
+			"tools": map[string]any{},
 			// logging capability signals that this server will emit
 			// notifications/message frames for job state changes.
 			"logging": map[string]any{},
@@ -393,6 +411,9 @@ func (s *Server) toolStartJob(ctx context.Context, args map[string]any) (toolRes
 	maxSteps := intArgDefault(args, "max_steps", 8)
 	strictnessLevel := stringArgDefault(args, "strictness_level", "normal")
 	contextMode := stringArgDefault(args, "context_mode", "full")
+	if err := validateWorkspaceDir(workspaceDir); err != nil {
+		return toolResult{}, err
+	}
 
 	input := orchestrator.CreateJobInput{
 		Goal:            goal,

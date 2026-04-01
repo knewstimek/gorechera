@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -100,6 +101,24 @@ func (s *Service) EventChan() <-chan EventNotification {
 	return s.eventChan
 }
 
+func validateWorkspaceDir(path string) error {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("workspace directory does not exist: %s", path)
+		}
+		return fmt.Errorf("stat workspace directory %q: %w", path, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("workspace directory does not exist: %s", path)
+	}
+	return nil
+}
+
 func (s *Service) Start(ctx context.Context, input CreateJobInput) (*domain.Job, error) {
 	now := time.Now().UTC()
 	if input.MaxSteps <= 0 {
@@ -125,6 +144,9 @@ func (s *Service) Start(ctx context.Context, input CreateJobInput) (*domain.Job,
 		MaxSteps:        input.MaxSteps,
 		CreatedAt:       now,
 		UpdatedAt:       now,
+	}
+	if err := validateWorkspaceDir(job.WorkspaceDir); err != nil {
+		return nil, err
 	}
 	job.LeaderContextSummary = fmt.Sprintf("Goal: %s", job.Goal)
 	s.addEvent(job, "job_created", "job created")
@@ -163,6 +185,9 @@ func (s *Service) StartAsync(ctx context.Context, input CreateJobInput) (*domain
 		MaxSteps:        input.MaxSteps,
 		CreatedAt:       now,
 		UpdatedAt:       now,
+	}
+	if err := validateWorkspaceDir(job.WorkspaceDir); err != nil {
+		return nil, err
 	}
 	job.LeaderContextSummary = fmt.Sprintf("Goal: %s", job.Goal)
 	s.addEvent(job, "job_created", "job created")
@@ -597,17 +622,25 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 	})
 	if err != nil {
 		last := &job.Steps[len(job.Steps)-1]
+		reason := fmt.Sprintf("worker execution failed: %v", err)
+		if action == provider.ProviderErrorActionBlock {
+			reason = fmt.Sprintf("worker execution blocked: %v", err)
+		}
+		structuredReason := classifyWorkerFailure(err, "")
 		last.FinishedAt = time.Now().UTC()
+		last.StructuredReason = structuredReason
 		if action == provider.ProviderErrorActionBlock {
 			last.Status = domain.StepStatusBlocked
-			last.BlockedReason = fmt.Sprintf("worker execution blocked: %v", err)
+			last.BlockedReason = reason
 			last.Summary = last.BlockedReason
-			_, blockErr := s.blockJobWithEvent(ctx, job, "worker_blocked", last.BlockedReason)
+			s.addEvent(job, "worker_blocked", formatWorkerFailureEventMessage(reason, structuredReason))
+			_, blockErr := s.blockJob(ctx, job, reason)
 			return blockErr
 		}
 		last.Status = domain.StepStatusFailed
-		last.ErrorReason = fmt.Sprintf("worker execution failed: %v", err)
+		last.ErrorReason = reason
 		last.Summary = last.ErrorReason
+		s.addEvent(job, "worker_failed", formatWorkerFailureEventMessage(reason, structuredReason))
 		_, failErr := s.failJob(ctx, job, last.ErrorReason)
 		return failErr
 	}
@@ -615,11 +648,29 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 
 	var worker domain.WorkerOutput
 	if err := json.Unmarshal([]byte(rawWorker), &worker); err != nil {
-		_, failErr := s.failJob(ctx, job, fmt.Sprintf("invalid worker json: %v", err))
+		last := &job.Steps[len(job.Steps)-1]
+		reason := fmt.Sprintf("invalid worker json: %v", err)
+		structuredReason := classifyWorkerFailure(err, rawWorker)
+		last.Status = domain.StepStatusFailed
+		last.ErrorReason = reason
+		last.StructuredReason = structuredReason
+		last.Summary = reason
+		last.FinishedAt = time.Now().UTC()
+		s.addEvent(job, "worker_failed", formatWorkerFailureEventMessage(reason, structuredReason))
+		_, failErr := s.failJob(ctx, job, reason)
 		return failErr
 	}
 	if err := schema.ValidateWorkerOutput(worker); err != nil {
-		_, failErr := s.failJob(ctx, job, fmt.Sprintf("worker schema validation failed: %v", err))
+		last := &job.Steps[len(job.Steps)-1]
+		reason := fmt.Sprintf("worker schema validation failed: %v", err)
+		structuredReason := classifyWorkerFailure(err, rawWorker)
+		last.Status = domain.StepStatusFailed
+		last.ErrorReason = reason
+		last.StructuredReason = structuredReason
+		last.Summary = reason
+		last.FinishedAt = time.Now().UTC()
+		s.addEvent(job, "worker_failed", formatWorkerFailureEventMessage(reason, structuredReason))
+		_, failErr := s.failJob(ctx, job, reason)
 		return failErr
 	}
 
@@ -634,6 +685,7 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 	last.Artifacts = artifactPaths
 	last.BlockedReason = worker.BlockedReason
 	last.ErrorReason = worker.ErrorReason
+	last.StructuredReason = nil
 	last.FinishedAt = time.Now().UTC()
 
 	switch worker.Status {
@@ -642,14 +694,21 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 		job.Status = domain.JobStatusRunning
 		s.addEvent(job, "worker_succeeded", worker.Summary)
 	case "blocked":
+		reason := firstNonEmpty(worker.BlockedReason, worker.Summary, "worker blocked")
+		last.StructuredReason = classifyWorkerFailure(nil, strings.Join([]string{worker.BlockedReason, worker.Summary, rawWorker}, "\n"))
 		last.Status = domain.StepStatusBlocked
-		_, blockErr := s.blockJobWithEvent(ctx, job, "worker_blocked", worker.BlockedReason)
+		last.BlockedReason = reason
+		s.addEvent(job, "worker_blocked", formatWorkerFailureEventMessage(reason, last.StructuredReason))
+		_, blockErr := s.blockJob(ctx, job, reason)
 		return blockErr
 	case "failed":
+		reason := firstNonEmpty(worker.ErrorReason, worker.Summary, "worker failed")
+		last.StructuredReason = classifyWorkerFailure(nil, strings.Join([]string{worker.ErrorReason, worker.Summary, rawWorker}, "\n"))
 		last.Status = domain.StepStatusFailed
+		last.ErrorReason = reason
 		job.Status = domain.JobStatusRunning
-		job.FailureReason = worker.ErrorReason
-		s.addEvent(job, "worker_failed", worker.ErrorReason)
+		job.FailureReason = reason
+		s.addEvent(job, "worker_failed", formatWorkerFailureEventMessage(reason, last.StructuredReason))
 	}
 
 	job.LeaderContextSummary = worker.Summary
@@ -936,12 +995,92 @@ func blockedReasonStrikeCount(job *domain.Job, reason string) int {
 		if !strings.HasSuffix(event.Kind, "_blocked") {
 			continue
 		}
-		if event.Message != reason {
+		if blockedEventReason(event.Message) != reason {
 			break
 		}
 		count++
 	}
 	return count
+}
+
+type workerFailureEventMessage struct {
+	Reason           string                   `json:"reason"`
+	StructuredReason *domain.StructuredReason `json:"structured_reason"`
+}
+
+func classifyWorkerFailure(err error, workerOutput string) *domain.StructuredReason {
+	detail := strings.TrimSpace(workerOutput)
+	if err != nil {
+		detail = strings.TrimSpace(err.Error())
+	}
+	combined := strings.ToLower(strings.TrimSpace(strings.Join([]string{
+		detail,
+		workerOutput,
+	}, "\n")))
+
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || strings.Contains(combined, context.DeadlineExceeded.Error()):
+		return &domain.StructuredReason{
+			Category:        "timeout",
+			Detail:          firstNonEmpty(detail, "worker execution timed out"),
+			SuggestedAction: "increase_timeout",
+		}
+	case isJSONUnmarshalError(err) || strings.Contains(combined, "json unmarshal") || strings.Contains(combined, "schema validation"):
+		return &domain.StructuredReason{
+			Category:        "schema_violation",
+			Detail:          firstNonEmpty(detail, "worker output schema violation"),
+			SuggestedAction: "retry",
+		}
+	case strings.Contains(combined, "permission") || strings.Contains(combined, "access"):
+		return &domain.StructuredReason{
+			Category:        "file_access",
+			Detail:          firstNonEmpty(detail, "worker file access failure"),
+			SuggestedAction: "check_permissions",
+		}
+	case strings.Contains(combined, "test"):
+		return &domain.StructuredReason{
+			Category:        "test_failure",
+			Detail:          firstNonEmpty(detail, "worker test failure"),
+			SuggestedAction: "fix_code",
+		}
+	case strings.Contains(combined, "build") || strings.Contains(combined, "compile"):
+		return &domain.StructuredReason{
+			Category:        "build_failure",
+			Detail:          firstNonEmpty(detail, "worker build failure"),
+			SuggestedAction: "fix_code",
+		}
+	default:
+		return nil
+	}
+}
+
+func formatWorkerFailureEventMessage(reason string, structured *domain.StructuredReason) string {
+	payload := workerFailureEventMessage{
+		Reason:           reason,
+		StructuredReason: structured,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Sprintf(`{"reason":%q,"structured_reason":null}`, reason)
+	}
+	return string(raw)
+}
+
+func blockedEventReason(message string) string {
+	var payload workerFailureEventMessage
+	if err := json.Unmarshal([]byte(message), &payload); err == nil && strings.TrimSpace(payload.Reason) != "" {
+		return payload.Reason
+	}
+	return message
+}
+
+func isJSONUnmarshalError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var syntaxErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	return errors.As(err, &syntaxErr) || errors.As(err, &typeErr)
 }
 
 func (s *Service) addEvent(job *domain.Job, kind, message string) {

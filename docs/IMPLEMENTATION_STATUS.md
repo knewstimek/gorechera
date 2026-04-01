@@ -61,6 +61,7 @@ All known bugs have been fixed (2026-04-02, TOCTOU fixed separately).
 - MCP server (JSON-RPC 2.0 stdio, 10 tools, notification support)
 - Evaluator strictness 3 levels (strict/normal/lenient) with per-level verification rules
 - TOCTOU fix: atomic harness ownership via claimHarness/releaseHarnessClaim + harnessInflight map
+- Fail-fast workspace directory validation during job creation in orchestrator Start/StartAsync and MCP start-job handling
 - Normal mode done convergence: GPT-only pipeline ~89 seconds end-to-end
 
 ## Not Implemented

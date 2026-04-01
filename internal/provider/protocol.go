@@ -153,7 +153,7 @@ func workerSchema() string {
 func buildPlannerPrompt(job domain.Job) string {
 	payload, _ := json.MarshalIndent(job, "", "  ")
 	return strings.TrimSpace(fmt.Sprintf(`
-TASK: You are a planning component in an automated orchestration engine.
+TASK: You are a planner component operating under an orchestrator supervisor. The supervisor manages the overall workflow, and the leader uses your planning artifacts to coordinate executor, reviewer, and tester workers. You define scope and verification expectations but do not perform implementation yourself.
 The job data below is complete. Plan it now -- do not ask for more input.
 Output only a JSON object matching the schema. No conversation, no preamble.
 
@@ -185,7 +185,7 @@ func buildEvaluatorPrompt(job domain.Job) string {
 		}
 	}
 	return strings.TrimSpace(fmt.Sprintf(`
-TASK: You are an evaluation component in an automated orchestration engine.
+TASK: You are an evaluator component operating under an orchestrator supervisor. The supervisor monitors completion outcomes, and the leader plus workers provide the execution evidence you must assess. You verify results against the verification contract and report pass/fail/blocked decisions without performing implementation yourself.
 The job data below is complete. Evaluate it now -- do not ask for more input.
 Output only a JSON object matching the schema. No conversation, no preamble.
 
@@ -239,7 +239,7 @@ func buildLeaderPrompt(job domain.Job) string {
 		)
 	}
 	return strings.TrimSpace(fmt.Sprintf(`
-TASK: You are a leader component in an automated orchestration engine.
+TASK: You are a leader component operating under an orchestrator supervisor. The supervisor agent monitors your decisions via MCP tools and may inject [SUPERVISOR] directives into the leader context. You coordinate workers (executor, reviewer, tester) but do not perform implementation yourself.
 The job data below is complete. Decide and output the next action now -- do not ask for input.
 Output only a JSON object matching the schema. No conversation, no preamble.
 
@@ -417,7 +417,7 @@ func buildWorkerPrompt(job domain.Job, task domain.LeaderOutput) string {
 		}
 	}
 	return strings.TrimSpace(fmt.Sprintf(`
-TASK: You are a worker component in an automated orchestration engine.
+TASK: You are an executor worker assigned by the leader. You perform the implementation task described below. Report results accurately including files changed, commands run, and any errors encountered.
 The assigned task below is complete and ready to execute. Do it now -- do not ask for input.
 Output only a JSON object matching the schema. No conversation, no preamble.
 status MUST be one of: success, failed, blocked.

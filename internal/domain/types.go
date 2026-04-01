@@ -215,6 +215,12 @@ type VerificationReport struct {
 	ContractRef   string   `json:"contract_ref,omitempty"`
 }
 
+type StructuredReason struct {
+	Category        string `json:"category"`
+	Detail          string `json:"detail"`
+	SuggestedAction string `json:"suggested_action"`
+}
+
 type TokenUsage struct {
 	InputTokens      int     `json:"input_tokens"`
 	OutputTokens     int     `json:"output_tokens"`
@@ -261,18 +267,19 @@ type Event struct {
 }
 
 type Step struct {
-	Index         int        `json:"index"`
-	Target        string     `json:"target"`
-	TaskType      string     `json:"task_type"`
-	TaskText      string     `json:"task_text"`
-	Status        StepStatus `json:"status"`
-	Summary       string     `json:"summary,omitempty"`
-	Artifacts     []string   `json:"artifacts,omitempty"`
-	BlockedReason string     `json:"blocked_reason,omitempty"`
-	ErrorReason   string     `json:"error_reason,omitempty"`
-	TokenUsage    TokenUsage `json:"token_usage"`
-	StartedAt     time.Time  `json:"started_at"`
-	FinishedAt    time.Time  `json:"finished_at"`
+	Index            int               `json:"index"`
+	Target           string            `json:"target"`
+	TaskType         string            `json:"task_type"`
+	TaskText         string            `json:"task_text"`
+	Status           StepStatus        `json:"status"`
+	Summary          string            `json:"summary,omitempty"`
+	Artifacts        []string          `json:"artifacts,omitempty"`
+	BlockedReason    string            `json:"blocked_reason,omitempty"`
+	ErrorReason      string            `json:"error_reason,omitempty"`
+	StructuredReason *StructuredReason `json:"structured_reason,omitempty"`
+	TokenUsage       TokenUsage        `json:"token_usage"`
+	StartedAt        time.Time         `json:"started_at"`
+	FinishedAt       time.Time         `json:"finished_at"`
 }
 
 type Job struct {
