@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -96,7 +95,7 @@ func (a *ClaudeAdapter) runStructured(ctx context.Context, workspaceDir, prompt,
 	executable := firstNonEmpty(a.executable, "claude")
 	result, err := a.runCommand(ctx, executable, a.runTime, workspaceDir, nil, prompt, args...)
 	if err != nil {
-		return "", commandFailedError(a.Name(), executable, fmt.Errorf("%w: %s%s", err, result.Stdout, result.Stderr))
+		return "", classifyCommandError(a.Name(), executable, result, err)
 	}
 	output := result.Stdout
 	if output == "" {
@@ -119,7 +118,7 @@ func extractJSONResult(output string) string {
 	// Claude --output-format json returns an envelope with either:
 	//   "result" field (text mode) or "structured_output" field (when --json-schema is used)
 	var envelope struct {
-		Result          string          `json:"result"`
+		Result           string          `json:"result"`
 		StructuredOutput json.RawMessage `json:"structured_output"`
 	}
 	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &envelope); err != nil {

@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -106,7 +105,7 @@ func (a *CodexAdapter) runStructured(ctx context.Context, workspaceDir, prompt, 
 	if executable := a.executable; executable != "" {
 		result, err := a.runCommand(ctx, executable, a.runTime, workspaceDir, nil, prompt, args...)
 		if err != nil {
-			return "", commandFailedError(a.Name(), executable, fmt.Errorf("%w: %s%s", err, result.Stdout, result.Stderr))
+			return "", classifyCommandError(a.Name(), executable, result, err)
 		}
 		data, readErr := os.ReadFile(outputPath)
 		if readErr != nil {

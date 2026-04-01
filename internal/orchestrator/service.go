@@ -21,6 +21,11 @@ import (
 
 var ErrHarnessOwnershipMismatch = errors.New("harness process not owned by job")
 
+const (
+	providerRetryLimit     = 3
+	providerRetryBaseDelay = 250 * time.Millisecond
+)
+
 // EventNotification carries a job state change that the MCP server can relay
 // to connected clients as a JSON-RPC notification. It is separate from
 // domain.Event so that the orchestrator package stays unaware of MCP details.
@@ -453,8 +458,13 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 			leaderRetryPending = false
 		}
 
-		rawLeader, err := s.sessions.RunLeader(ctx, *job)
+		rawLeader, action, err := s.executeProviderPhase(ctx, job, "leader", func() (string, error) {
+			return s.sessions.RunLeader(ctx, *job)
+		})
 		if err != nil {
+			if action == provider.ProviderErrorActionBlock {
+				return s.blockJobWithEvent(ctx, job, "job_blocked", fmt.Sprintf("leader execution blocked: %v", err))
+			}
 			return s.failJob(ctx, job, fmt.Sprintf("leader execution failed: %v", err))
 		}
 
@@ -539,27 +549,13 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 		case "fail":
 			return s.failJob(ctx, job, leader.Reason)
 		case "blocked":
-			job.Status = domain.JobStatusBlocked
-			job.BlockedReason = leader.Reason
-			s.addEvent(job, "job_blocked", leader.Reason)
-			s.touch(job)
-			if err := s.state.SaveJob(ctx, job); err != nil {
-				return nil, err
-			}
-			return job, nil
+			return s.blockJobWithEvent(ctx, job, "job_blocked", leader.Reason)
 		default:
 			return s.failJob(ctx, job, fmt.Sprintf("unrecognized leader action: %q", leader.Action))
 		}
 	}
 
-	job.Status = domain.JobStatusBlocked
-	job.BlockedReason = "max_steps_exceeded"
-	s.addEvent(job, "job_blocked", "max_steps_exceeded")
-	s.touch(job)
-	if err := s.state.SaveJob(ctx, job); err != nil {
-		return nil, err
-	}
-	return job, nil
+	return s.blockJobWithEvent(ctx, job, "job_blocked", "max_steps_exceeded")
 }
 
 func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader domain.LeaderOutput) error {
@@ -590,9 +586,23 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 		return err
 	}
 
-	rawWorker, err := s.sessions.RunWorker(ctx, *job, task)
+	rawWorker, action, err := s.executeProviderPhase(ctx, job, "worker", func() (string, error) {
+		return s.sessions.RunWorker(ctx, *job, task)
+	})
 	if err != nil {
-		_, failErr := s.failJob(ctx, job, fmt.Sprintf("worker execution failed: %v", err))
+		last := &job.Steps[len(job.Steps)-1]
+		last.FinishedAt = time.Now().UTC()
+		if action == provider.ProviderErrorActionBlock {
+			last.Status = domain.StepStatusBlocked
+			last.BlockedReason = fmt.Sprintf("worker execution blocked: %v", err)
+			last.Summary = last.BlockedReason
+			_, blockErr := s.blockJobWithEvent(ctx, job, "worker_blocked", last.BlockedReason)
+			return blockErr
+		}
+		last.Status = domain.StepStatusFailed
+		last.ErrorReason = fmt.Sprintf("worker execution failed: %v", err)
+		last.Summary = last.ErrorReason
+		_, failErr := s.failJob(ctx, job, last.ErrorReason)
 		return failErr
 	}
 
@@ -626,9 +636,8 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 		s.addEvent(job, "worker_succeeded", worker.Summary)
 	case "blocked":
 		last.Status = domain.StepStatusBlocked
-		job.Status = domain.JobStatusBlocked
-		job.BlockedReason = worker.BlockedReason
-		s.addEvent(job, "worker_blocked", worker.BlockedReason)
+		_, blockErr := s.blockJobWithEvent(ctx, job, "worker_blocked", worker.BlockedReason)
+		return blockErr
 	case "failed":
 		last.Status = domain.StepStatusFailed
 		job.Status = domain.JobStatusRunning
@@ -687,10 +696,8 @@ func (s *Service) runSystemStepWithApproval(ctx context.Context, job *domain.Job
 			TaskText:     leader.TaskText,
 			SystemAction: leader.SystemAction,
 		}
-		job.LeaderContextSummary = decision.Reason
-		s.addEvent(job, "system_blocked", decision.Reason)
-		s.touch(job)
-		return s.state.SaveJob(ctx, job)
+		_, blockErr := s.blockJobWithEvent(ctx, job, "system_blocked", decision.Reason)
+		return blockErr
 	}
 	job.PendingApproval = nil
 
@@ -717,9 +724,8 @@ func (s *Service) runSystemStepWithApproval(ctx context.Context, job *domain.Job
 	case errors.Is(runErr, runtimeexec.ErrNotAllowed):
 		last.Status = domain.StepStatusBlocked
 		last.BlockedReason = runErr.Error()
-		job.Status = domain.JobStatusBlocked
-		job.BlockedReason = runErr.Error()
-		s.addEvent(job, "system_blocked", runErr.Error())
+		_, blockErr := s.blockJobWithEvent(ctx, job, "system_blocked", runErr.Error())
+		return blockErr
 	case result.TimedOut:
 		last.Status = domain.StepStatusFailed
 		last.ErrorReason = runErr.Error()
@@ -753,16 +759,86 @@ func (s *Service) failJob(ctx context.Context, job *domain.Job, reason string) (
 }
 
 func (s *Service) blockJob(ctx context.Context, job *domain.Job, reason string) (*domain.Job, error) {
+	return s.blockJobWithEvent(ctx, job, "job_blocked", reason)
+}
+
+func (s *Service) blockJobWithEvent(ctx context.Context, job *domain.Job, eventKind, reason string) (*domain.Job, error) {
+	if blockedReasonStrikeCount(job, reason) >= 3 {
+		job.PendingApproval = nil
+		job.BlockedReason = ""
+		return s.failJob(ctx, job, fmt.Sprintf("blocked reason repeated 3 times: %s", reason))
+	}
 	job.Status = domain.JobStatusBlocked
 	job.BlockedReason = reason
 	job.FailureReason = ""
 	job.LeaderContextSummary = reason
-	s.addEvent(job, "job_blocked", reason)
+	s.addEvent(job, eventKind, reason)
 	s.touch(job)
 	if err := s.state.SaveJob(ctx, job); err != nil {
 		return nil, err
 	}
 	return job, nil
+}
+
+func (s *Service) executeProviderPhase(ctx context.Context, job *domain.Job, phase string, invoke func() (string, error)) (string, provider.ProviderErrorAction, error) {
+	for attempt := 0; ; attempt++ {
+		raw, err := invoke()
+		if err == nil {
+			return raw, "", nil
+		}
+
+		action := providerActionForError(err)
+		if action == provider.ProviderErrorActionRetry && attempt < providerRetryLimit {
+			delay := providerRetryBackoff(attempt)
+			s.addEvent(job, "provider_retry", fmt.Sprintf("%s retry %d/%d after %s: %v", phase, attempt+1, providerRetryLimit, delay, err))
+			if err := waitForProviderRetry(ctx, delay); err != nil {
+				return "", provider.ProviderErrorActionFail, fmt.Errorf("%s retry interrupted: %w", phase, err)
+			}
+			continue
+		}
+		if action == provider.ProviderErrorActionRetry {
+			return "", provider.ProviderErrorActionFail, fmt.Errorf("%s execution failed after %d retries: %w", phase, providerRetryLimit, err)
+		}
+		return "", action, err
+	}
+}
+
+func providerActionForError(err error) provider.ProviderErrorAction {
+	var perr *provider.ProviderError
+	if errors.As(err, &perr) && perr.RecommendedAction != "" {
+		return perr.RecommendedAction
+	}
+	return provider.ProviderErrorActionFail
+}
+
+func providerRetryBackoff(attempt int) time.Duration {
+	return providerRetryBaseDelay * time.Duration(1<<attempt)
+}
+
+func waitForProviderRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func blockedReasonStrikeCount(job *domain.Job, reason string) int {
+	count := 1
+	for i := len(job.Events) - 1; i >= 0; i-- {
+		event := job.Events[i]
+		if !strings.HasSuffix(event.Kind, "_blocked") {
+			continue
+		}
+		if event.Message != reason {
+			break
+		}
+		count++
+	}
+	return count
 }
 
 func (s *Service) addEvent(job *domain.Job, kind, message string) {
