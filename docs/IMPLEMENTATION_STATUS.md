@@ -68,7 +68,8 @@ All known bugs have been fixed (2026-04-02, TOCTOU fixed separately).
 - Normal strictness evaluator gate: `implement` required, `review` optional, rule-based override for provider blocked
 - Claude adapter real integration (planner/leader/worker confirmed, --permission-mode dontAsk, --json-schema, stdin prompt)
 - Codex adapter real integration (GPT full pipeline done convergence achieved, stdin prompt, workspace-write sandbox)
-- MCP server (JSON-RPC 2.0 stdio, 10 tools, notification support)
+- MCP server (JSON-RPC 2.0 stdio, 12 tools, notification support)
+- Sequential job chaining with persisted `JobChain` state, automatic next-goal start on successful completion, and terminal failure propagation on blocked/failed chained jobs
 - Evaluator strictness 3 levels (strict/normal/lenient) with per-level verification rules
 - TOCTOU fix: atomic harness ownership via claimHarness/releaseHarnessClaim + harnessInflight map
 - Fail-fast workspace directory validation during job creation in orchestrator Start/StartAsync and MCP start-job handling
@@ -125,3 +126,10 @@ Currently at Phase 1. Known bugs fixed. Next:
 2. **Phase 2**: Error classification + retry 3-strike + blocked_reason standardization
 3. **Phase 3**: Run Gorechera on itself as a job, evaluator verifies `go build && go test`
 4. **Phase 4**: Human-supervised self-hosting loop
+
+## Recent Update
+
+2026-04-02:
+- Added persisted sequential job chaining in `internal/domain/types.go`, `internal/store/state_store.go`, and `internal/orchestrator/service.go`
+- Added MCP chain tools: `gorechera_start_chain` and `gorechera_chain_status`
+- Added focused store/service/MCP tests covering chain persistence, first-goal start, sequential advancement, final done, and terminal failure stop behavior

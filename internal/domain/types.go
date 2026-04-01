@@ -167,6 +167,25 @@ type WorkerTask struct {
 	NextHint  string   `json:"next_hint,omitempty"`
 }
 
+type ChainGoal struct {
+	Goal            string       `json:"goal"`
+	Provider        ProviderName `json:"provider"`
+	StrictnessLevel string       `json:"strictness_level,omitempty"`
+	ContextMode     string       `json:"context_mode,omitempty"`
+	MaxSteps        int          `json:"max_steps"`
+	JobID           string       `json:"job_id,omitempty"`
+	Status          string       `json:"status"`
+}
+
+type JobChain struct {
+	ID           string      `json:"id"`
+	Goals        []ChainGoal `json:"goals"`
+	CurrentIndex int         `json:"current_index"`
+	Status       string      `json:"status"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+}
+
 type PlanningArtifact struct {
 	Goal                 string                `json:"goal"`
 	TechStack            string                `json:"tech_stack,omitempty"`
@@ -297,6 +316,8 @@ type Job struct {
 	PlanningArtifacts       []string              `json:"planning_artifacts,omitempty"`
 	SprintContractRef       string                `json:"sprint_contract_ref,omitempty"`
 	EvaluatorReportRef      string                `json:"evaluator_report_ref,omitempty"`
+	ChainID                 string                `json:"chain_id,omitempty"`
+	ChainGoalIndex          int                   `json:"chain_goal_index,omitempty"`
 	Status                  JobStatus             `json:"status"`
 	Provider                ProviderName          `json:"provider"`
 	MaxSteps                int                   `json:"max_steps"`

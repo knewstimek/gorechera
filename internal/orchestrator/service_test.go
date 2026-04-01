@@ -267,6 +267,146 @@ func waitForJobStatus(t *testing.T, service *orchestrator.Service, jobID string,
 	}
 }
 
+func waitForChainStatus(t *testing.T, service *orchestrator.Service, chainID string, want string) *domain.JobChain {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		chain, err := service.GetChain(context.Background(), chainID)
+		if err == nil && chain.Status == want {
+			return chain
+		}
+
+		if time.Now().After(deadline) {
+			if err != nil {
+				t.Fatalf("timed out waiting for chain %s: %v", chainID, err)
+			}
+			t.Fatalf("timed out waiting for chain %s status %s, got %s", chainID, want, chain.Status)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestServiceStartChainStartsFirstGoalAndAdvancesSequentially(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	workspace := t.TempDir()
+	registry := provider.NewRegistry()
+	control := &chainOutcomeProvider{
+		name:    domain.ProviderName("chain-control"),
+		release: make(chan struct{}),
+	}
+	registry.Register(control)
+
+	service := orchestrator.NewService(
+		provider.NewSessionManager(registry),
+		store.NewStateStore(filepath.Join(root, "state")),
+		store.NewArtifactStore(filepath.Join(root, "artifacts")),
+		root,
+	)
+
+	chain, err := service.StartChain(context.Background(), []domain.ChainGoal{
+		{Goal: "hold first", Provider: control.name, StrictnessLevel: "lenient", ContextMode: "full", MaxSteps: 4},
+		{Goal: "finish second", Provider: control.name, StrictnessLevel: "lenient", ContextMode: "full", MaxSteps: 4},
+	}, workspace)
+	if err != nil {
+		t.Fatalf("StartChain returned error: %v", err)
+	}
+
+	chainPath := filepath.Join(root, "state", "chains", chain.ID+".json")
+	if _, err := os.Stat(chainPath); err != nil {
+		t.Fatalf("expected persisted chain file %q: %v", chainPath, err)
+	}
+
+	initial, err := service.GetChain(context.Background(), chain.ID)
+	if err != nil {
+		t.Fatalf("GetChain returned error: %v", err)
+	}
+	if initial.Status != "running" {
+		t.Fatalf("expected running chain, got %s", initial.Status)
+	}
+	if initial.CurrentIndex != 0 {
+		t.Fatalf("expected current index 0, got %d", initial.CurrentIndex)
+	}
+	if initial.Goals[0].Status != "running" || initial.Goals[0].JobID == "" {
+		t.Fatalf("expected first goal running with job id, got %#v", initial.Goals[0])
+	}
+	if initial.Goals[1].Status != "pending" || initial.Goals[1].JobID != "" {
+		t.Fatalf("expected second goal pending without job id, got %#v", initial.Goals[1])
+	}
+
+	chains, err := service.ListChains(context.Background())
+	if err != nil {
+		t.Fatalf("ListChains returned error: %v", err)
+	}
+	if len(chains) != 1 || chains[0].ID != chain.ID {
+		t.Fatalf("expected single chain %q, got %#v", chain.ID, chains)
+	}
+
+	close(control.release)
+
+	done := waitForChainStatus(t, service, chain.ID, "done")
+	if done.CurrentIndex != 1 {
+		t.Fatalf("expected final current index 1, got %d", done.CurrentIndex)
+	}
+	if done.Goals[0].Status != "done" || done.Goals[0].JobID == "" {
+		t.Fatalf("expected first goal done with job id, got %#v", done.Goals[0])
+	}
+	if done.Goals[1].Status != "done" || done.Goals[1].JobID == "" {
+		t.Fatalf("expected second goal done with job id, got %#v", done.Goals[1])
+	}
+}
+
+func TestServiceStartChainStopsOnUnsuccessfulTerminalJob(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name      string
+		firstGoal string
+	}{
+		{name: "blocked", firstGoal: "block first"},
+		{name: "failed", firstGoal: "fail first"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			workspace := t.TempDir()
+			registry := provider.NewRegistry()
+			control := &chainOutcomeProvider{
+				name:    domain.ProviderName("chain-outcome-" + tc.name),
+				release: make(chan struct{}),
+			}
+			registry.Register(control)
+
+			service := orchestrator.NewService(
+				provider.NewSessionManager(registry),
+				store.NewStateStore(filepath.Join(root, "state")),
+				store.NewArtifactStore(filepath.Join(root, "artifacts")),
+				root,
+			)
+
+			chain, err := service.StartChain(context.Background(), []domain.ChainGoal{
+				{Goal: tc.firstGoal, Provider: control.name, StrictnessLevel: "lenient", ContextMode: "full", MaxSteps: 4},
+				{Goal: "finish second", Provider: control.name, StrictnessLevel: "lenient", ContextMode: "full", MaxSteps: 4},
+			}, workspace)
+			if err != nil {
+				t.Fatalf("StartChain returned error: %v", err)
+			}
+
+			failed := waitForChainStatus(t, service, chain.ID, "failed")
+			if failed.CurrentIndex != 0 {
+				t.Fatalf("expected chain to stop on first goal, got current index %d", failed.CurrentIndex)
+			}
+			if failed.Goals[0].Status != "failed" || failed.Goals[0].JobID == "" {
+				t.Fatalf("expected first goal failed with job id, got %#v", failed.Goals[0])
+			}
+			if failed.Goals[1].Status != "pending" || failed.Goals[1].JobID != "" {
+				t.Fatalf("expected second goal to remain pending, got %#v", failed.Goals[1])
+			}
+		})
+	}
+}
+
 func TestServiceExecutesAllowedSystemAction(t *testing.T) {
 	t.Parallel()
 
@@ -1902,4 +2042,35 @@ func (p *sanitizingBlockedWorkerProvider) RunWorker(_ context.Context, _ domain.
 
 func (p *sanitizingBlockedWorkerProvider) RunEvaluator(_ context.Context, _ domain.Job) (string, error) {
 	return `{"status":"passed","passed":true,"score":100,"reason":"accepted","missing_step_types":[],"evidence":["sanitized"],"contract_ref":"","verification_report":{"status":"passed","passed":true,"reason":"accepted","evidence":["sanitized"],"missing_checks":[],"artifacts":[],"contract_ref":""}}`, nil
+}
+
+type chainOutcomeProvider struct {
+	name    domain.ProviderName
+	release chan struct{}
+}
+
+func (p *chainOutcomeProvider) Name() domain.ProviderName {
+	return p.name
+}
+
+func (p *chainOutcomeProvider) RunLeader(_ context.Context, job domain.Job) (string, error) {
+	switch {
+	case strings.Contains(job.Goal, "hold"):
+		<-p.release
+		return `{"action":"complete","target":"none","task_type":"none","reason":"released"}`, nil
+	case strings.Contains(job.Goal, "block"):
+		return `{"action":"blocked","target":"none","task_type":"none","reason":"chain blocked"}`, nil
+	case strings.Contains(job.Goal, "fail"):
+		return `{"action":"fail","target":"none","task_type":"none","reason":"chain failed"}`, nil
+	default:
+		return `{"action":"complete","target":"none","task_type":"none","reason":"chain complete"}`, nil
+	}
+}
+
+func (p *chainOutcomeProvider) RunWorker(_ context.Context, _ domain.Job, _ domain.LeaderOutput) (string, error) {
+	return `{"status":"success","summary":"unused","artifacts":[],"blocked_reason":"","error_reason":"","next_recommended_action":""}`, nil
+}
+
+func (p *chainOutcomeProvider) RunEvaluator(_ context.Context, _ domain.Job) (string, error) {
+	return `{"status":"passed","passed":true,"score":100,"reason":"accepted","missing_step_types":[],"evidence":["chain"],"contract_ref":"","verification_report":{"status":"passed","passed":true,"reason":"accepted","evidence":["chain"],"missing_checks":[],"artifacts":[],"contract_ref":""}}`, nil
 }

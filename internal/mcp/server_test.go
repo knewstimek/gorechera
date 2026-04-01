@@ -95,6 +95,71 @@ func TestToolStartJobAcceptsExistingWorkspace(t *testing.T) {
 	waitForJobStatus(t, service, job.ID, domain.JobStatusBlocked)
 }
 
+func TestToolStartChainReturnsChainIDAndStatus(t *testing.T) {
+	t.Parallel()
+
+	control := &mcpChainProvider{
+		name:    domain.ProviderName("mcp-chain"),
+		release: make(chan struct{}),
+	}
+	server, service, _ := newTestServer(t, control)
+	workspace := t.TempDir()
+
+	resp := server.handleToolCall(mustToolCallRequest(t, "gorechera_start_chain", map[string]any{
+		"workspace_dir": workspace,
+		"goals": []map[string]any{
+			{
+				"goal":             "hold first",
+				"provider":         string(control.name),
+				"strictness_level": "lenient",
+				"context_mode":     "full",
+				"max_steps":        4,
+			},
+			{
+				"goal":             "finish second",
+				"provider":         string(control.name),
+				"strictness_level": "lenient",
+				"context_mode":     "full",
+				"max_steps":        4,
+			},
+		},
+	}))
+	if resp == nil || resp.Error != nil {
+		t.Fatalf("expected successful chain start response, got %#v", resp)
+	}
+
+	var started struct {
+		ChainID string `json:"chain_id"`
+	}
+	if err := json.Unmarshal([]byte(toolResultText(t, resp.Result.(toolResult))), &started); err != nil {
+		t.Fatalf("failed to decode chain start result: %v", err)
+	}
+	if started.ChainID == "" {
+		t.Fatal("expected non-empty chain id")
+	}
+
+	statusResult, err := server.toolChainStatus(context.Background(), map[string]any{"chain_id": started.ChainID})
+	if err != nil {
+		t.Fatalf("toolChainStatus returned error: %v", err)
+	}
+	var chain domain.JobChain
+	if err := json.Unmarshal([]byte(toolResultText(t, statusResult)), &chain); err != nil {
+		t.Fatalf("failed to decode chain status: %v", err)
+	}
+	if chain.ID != started.ChainID {
+		t.Fatalf("expected chain id %q, got %q", started.ChainID, chain.ID)
+	}
+	if chain.Goals[0].Status != "running" || chain.Goals[0].JobID == "" {
+		t.Fatalf("expected first goal running with job id, got %#v", chain.Goals[0])
+	}
+	if chain.Goals[1].Status != "pending" || chain.Goals[1].JobID != "" {
+		t.Fatalf("expected second goal pending, got %#v", chain.Goals[1])
+	}
+
+	close(control.release)
+	waitForChainStatus(t, service, started.ChainID, "done")
+}
+
 func TestToolStartJobRejectsRelativeWorkspaceBeforeExecution(t *testing.T) {
 	t.Parallel()
 
@@ -211,4 +276,48 @@ func waitForJobStatus(t *testing.T, service *orchestrator.Service, jobID string,
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+func waitForChainStatus(t *testing.T, service *orchestrator.Service, chainID string, want string) {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		chain, err := service.GetChain(context.Background(), chainID)
+		if err == nil && chain.Status == want {
+			return
+		}
+
+		if time.Now().After(deadline) {
+			if err != nil {
+				t.Fatalf("timed out waiting for chain %s: %v", chainID, err)
+			}
+			t.Fatalf("timed out waiting for chain %s status %s, got %s", chainID, want, chain.Status)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+type mcpChainProvider struct {
+	name    domain.ProviderName
+	release chan struct{}
+}
+
+func (p *mcpChainProvider) Name() domain.ProviderName {
+	return p.name
+}
+
+func (p *mcpChainProvider) RunLeader(_ context.Context, job domain.Job) (string, error) {
+	if strings.Contains(job.Goal, "hold") {
+		<-p.release
+	}
+	return `{"action":"complete","target":"none","task_type":"none","reason":"chain goal complete"}`, nil
+}
+
+func (p *mcpChainProvider) RunWorker(_ context.Context, _ domain.Job, _ domain.LeaderOutput) (string, error) {
+	return `{"status":"success","summary":"unused","artifacts":[],"blocked_reason":"","error_reason":"","next_recommended_action":""}`, nil
+}
+
+func (p *mcpChainProvider) RunEvaluator(_ context.Context, _ domain.Job) (string, error) {
+	return `{"status":"passed","passed":true,"score":100,"reason":"accepted","missing_step_types":[],"evidence":["chain"],"contract_ref":"","verification_report":{"status":"passed","passed":true,"reason":"accepted","evidence":["chain"],"missing_checks":[],"artifacts":[],"contract_ref":""}}`, nil
 }

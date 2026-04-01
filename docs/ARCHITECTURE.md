@@ -5,9 +5,9 @@
 ```
 cmd/gorechera/main.go           -- CLI entrypoint, flag parsing, command routing
 internal/
-  domain/types.go               -- ALL domain types (Job, Step, TokenUsage, Event, LeaderOutput, WorkerOutput, etc.)
+  domain/types.go               -- ALL domain types (Job, JobChain, ChainGoal, Step, TokenUsage, Event, LeaderOutput, WorkerOutput, etc.)
   orchestrator/
-    service.go                  -- Core: runLoop, Start/Resume/Cancel/Retry/Approve/Reject, harness mgmt
+    service.go                  -- Core: runLoop, Start/StartChain/Resume/Cancel/Retry/Approve/Reject, chain advancement, harness mgmt
     planning.go                 -- Planner phase, buildPlanningArtifact, buildSprintContract
     evaluator.go                -- Evaluator phase, mergeEvaluatorReport, scoreCompletion, strictness-aware completion gates
     verification.go             -- VerificationContract build/load/validate
@@ -31,7 +31,7 @@ internal/
     policy.go                   -- Runtime command allowlist (per category)
     types.go                    -- Category, Request, ProcessHandle, Result
   store/
-    state_store.go              -- File-based Job save/load/list (JSON, atomic write)
+    state_store.go              -- File-based Job + JobChain save/load/list (JSON, atomic write)
     artifact_store.go           -- Artifact materialization (worker/system/text/JSON)
 ```
 
@@ -52,6 +52,10 @@ Job:  starting -> running -> waiting_leader -> (action) ->
         - evaluator blocked completion
 
 Step: pending -> active -> succeeded / blocked / failed / skipped
+
+ChainGoal: pending -> running -> done / failed
+
+JobChain: running -> done / failed
 ```
 
 ## Core Loop (service.go:runLoop)
@@ -81,6 +85,18 @@ Step: pending -> active -> succeeded / blocked / failed / skipped
 
 3. If max_steps exceeded: blocked with "max_steps_exceeded"
 ```
+
+## Sequential Job Chaining
+
+`StartChain()` persists a `JobChain`, starts the first goal asynchronously, and records that goal's `JobID` on the chain before the goroutine is launched.
+
+When a chained job reaches evaluator-approved `done`, `handleChainCompletion()` loads the persisted chain and `advanceChain()` either:
+- marks the finished goal `done` and starts the next pending goal
+- or marks the full chain `done` when the final goal finishes
+
+When a chained job reaches a terminal `blocked` or `failed` state, `handleChainTerminalState()` marks the active `ChainGoal` and the whole `JobChain` as `failed`. No later goals are started.
+
+Later chain goals remain `pending` with empty `JobID` fields until `advanceChain()` starts them.
 
 NOTE: Both `run_worker` and `run_workers` go through `runWorkerStep()`, which calls `buildWorkerPlans()` internally. `buildWorkerPlans` dispatches to single or parallel based on the action.
 
@@ -199,6 +215,13 @@ Inside `handleJob`, sub-paths are parsed manually:
 ```
 
 To add a new route: add a case in the sub-path switch inside handleJob (server.go).
+
+## MCP Tooling
+
+The MCP stdio server exposes both single-job and chain lifecycle tools:
+- `gorechera_start_job`, `gorechera_status`, `gorechera_list_jobs`, `gorechera_events`, `gorechera_artifacts`
+- `gorechera_start_chain`, `gorechera_chain_status`
+- control-plane tools: `gorechera_approve`, `gorechera_reject`, `gorechera_retry`, `gorechera_cancel`, `gorechera_resume`, `gorechera_steer`
 
 ## CLI Command Pattern
 

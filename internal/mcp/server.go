@@ -121,9 +121,12 @@ type toolInputSchema struct {
 }
 
 type schemaProp struct {
-	Type        string `json:"type"`
-	Description string `json:"description,omitempty"`
-	Default     any    `json:"default,omitempty"`
+	Type        string                `json:"type"`
+	Description string                `json:"description,omitempty"`
+	Default     any                   `json:"default,omitempty"`
+	Properties  map[string]schemaProp `json:"properties,omitempty"`
+	Items       *schemaProp           `json:"items,omitempty"`
+	Required    []string              `json:"required,omitempty"`
 }
 
 type toolDef struct {
@@ -210,6 +213,32 @@ func toolList() []toolDef {
 			},
 		},
 		{
+			Name:        "gorechera_start_chain",
+			Description: "Start a sequential chain of jobs. The first goal starts immediately and later goals start only after the previous job finishes successfully.",
+			InputSchema: toolInputSchema{
+				Type: "object",
+				Properties: map[string]schemaProp{
+					"workspace_dir": {Type: "string", Description: "Absolute path of the workspace directory"},
+					"goals": {
+						Type:        "array",
+						Description: "Sequential goals to execute",
+						Items: &schemaProp{
+							Type: "object",
+							Properties: map[string]schemaProp{
+								"goal":             {Type: "string", Description: "Natural-language goal for this chain step"},
+								"provider":         {Type: "string", Description: "Provider name: mock | codex | claude"},
+								"strictness_level": {Type: "string", Description: "Evaluator strictness: strict | normal | lenient", Default: "normal"},
+								"context_mode":     {Type: "string", Description: "Leader context mode: full | summary | minimal", Default: "full"},
+								"max_steps":        {Type: "integer", Description: "Maximum leader steps for this goal", Default: 8},
+							},
+							Required: []string{"goal"},
+						},
+					},
+				},
+				Required: []string{"goals", "workspace_dir"},
+			},
+		},
+		{
 			Name:        "gorechera_list_jobs",
 			Description: "List all jobs.",
 			InputSchema: toolInputSchema{Type: "object"},
@@ -223,6 +252,17 @@ func toolList() []toolDef {
 					"job_id": {Type: "string", Description: "Job ID"},
 				},
 				Required: []string{"job_id"},
+			},
+		},
+		{
+			Name:        "gorechera_chain_status",
+			Description: "Get the current status of a sequential job chain.",
+			InputSchema: toolInputSchema{
+				Type: "object",
+				Properties: map[string]schemaProp{
+					"chain_id": {Type: "string", Description: "Chain ID"},
+				},
+				Required: []string{"chain_id"},
 			},
 		},
 		{
@@ -351,10 +391,14 @@ func (s *Server) handleToolCall(req jsonRPCRequest) *jsonRPCResponse {
 	switch p.Name {
 	case "gorechera_start_job":
 		result, err = s.toolStartJob(ctx, args)
+	case "gorechera_start_chain":
+		result, err = s.toolStartChain(ctx, args)
 	case "gorechera_list_jobs":
 		result, err = s.toolListJobs(ctx)
 	case "gorechera_status":
 		result, err = s.toolStatus(ctx, args)
+	case "gorechera_chain_status":
+		result, err = s.toolChainStatus(ctx, args)
 	case "gorechera_events":
 		result, err = s.toolEvents(ctx, args)
 	case "gorechera_artifacts":
@@ -417,6 +461,46 @@ func (s *Server) toolStartJob(ctx context.Context, args map[string]any) (toolRes
 	return jsonResult(job)
 }
 
+func (s *Server) toolStartChain(ctx context.Context, args map[string]any) (toolResult, error) {
+	workspaceDir, err := requireStringArg(args, "workspace_dir")
+	if err != nil {
+		return toolResult{}, err
+	}
+	if err := orchestrator.ValidateWorkspaceDir(workspaceDir); err != nil {
+		return toolResult{}, err
+	}
+
+	rawGoals, ok := args["goals"].([]any)
+	if !ok || len(rawGoals) == 0 {
+		return toolResult{}, fmt.Errorf("goals is required")
+	}
+
+	goals := make([]domain.ChainGoal, 0, len(rawGoals))
+	for i, rawGoal := range rawGoals {
+		goalMap, ok := rawGoal.(map[string]any)
+		if !ok {
+			return toolResult{}, fmt.Errorf("goals[%d] must be an object", i)
+		}
+		goal := domain.ChainGoal{
+			Goal:            stringArg(goalMap, "goal"),
+			Provider:        domain.ProviderName(stringArg(goalMap, "provider")),
+			StrictnessLevel: stringArgDefault(goalMap, "strictness_level", "normal"),
+			ContextMode:     stringArgDefault(goalMap, "context_mode", "full"),
+			MaxSteps:        intArgDefault(goalMap, "max_steps", 8),
+		}
+		if strings.TrimSpace(goal.Goal) == "" {
+			return toolResult{}, fmt.Errorf("goals[%d].goal is required", i)
+		}
+		goals = append(goals, goal)
+	}
+
+	chain, err := s.service.StartChain(ctx, goals, workspaceDir)
+	if err != nil {
+		return toolResult{}, err
+	}
+	return jsonResult(map[string]any{"chain_id": chain.ID})
+}
+
 func (s *Server) toolListJobs(ctx context.Context) (toolResult, error) {
 	jobs, err := s.service.List(ctx)
 	if err != nil {
@@ -435,6 +519,18 @@ func (s *Server) toolStatus(ctx context.Context, args map[string]any) (toolResul
 		return toolResult{}, err
 	}
 	return jsonResult(job)
+}
+
+func (s *Server) toolChainStatus(ctx context.Context, args map[string]any) (toolResult, error) {
+	chainID, err := requireStringArg(args, "chain_id")
+	if err != nil {
+		return toolResult{}, err
+	}
+	chain, err := s.service.GetChain(ctx, chainID)
+	if err != nil {
+		return toolResult{}, err
+	}
+	return jsonResult(chain)
 }
 
 func (s *Server) toolEvents(ctx context.Context, args map[string]any) (toolResult, error) {

@@ -48,6 +48,8 @@ type CreateJobInput struct {
 	MaxSteps        int
 	StrictnessLevel string // strict | normal | lenient; empty defaults to "normal"
 	ContextMode     string // full | summary | minimal; empty defaults to "full"
+	ChainID         string
+	ChainGoalIndex  int
 }
 
 type Service struct {
@@ -101,47 +103,74 @@ func (s *Service) EventChan() <-chan EventNotification {
 }
 
 func (s *Service) Start(ctx context.Context, input CreateJobInput) (*domain.Job, error) {
-	now := time.Now().UTC()
-	if input.MaxSteps <= 0 {
-		input.MaxSteps = 8
-	}
-	if input.Provider == "" {
-		input.Provider = domain.ProviderMock
-	}
-	roleProfiles := input.RoleProfiles.Normalize(input.Provider)
-
-	job := &domain.Job{
-		ID:              newJobID(now),
-		Goal:            strings.TrimSpace(input.Goal),
-		TechStack:       strings.TrimSpace(input.TechStack),
-		WorkspaceDir:    firstNonEmpty(strings.TrimSpace(input.WorkspaceDir), s.workspaceRoot),
-		Constraints:     input.Constraints,
-		DoneCriteria:    input.DoneCriteria,
-		StrictnessLevel: normalizeStrictnessLevel(input.StrictnessLevel),
-		ContextMode:     normalizeContextMode(input.ContextMode),
-		RoleProfiles:    roleProfiles,
-		Status:          domain.JobStatusStarting,
-		Provider:        input.Provider,
-		MaxSteps:        input.MaxSteps,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-	}
-	if err := ValidateWorkspaceDir(job.WorkspaceDir); err != nil {
+	job, err := s.prepareJob(input)
+	if err != nil {
 		return nil, err
 	}
-	job.LeaderContextSummary = fmt.Sprintf("Goal: %s", job.Goal)
-	s.addEvent(job, "job_created", "job created")
-
-	if err := s.state.SaveJob(ctx, job); err != nil {
-		return nil, err
-	}
-	return s.runLoop(ctx, job)
+	return s.startPreparedJob(ctx, job)
 }
 
 // StartAsync creates a job synchronously (so the caller gets the ID immediately)
 // and runs the main loop in a background goroutine. Use this when the caller
 // cannot block until the job finishes (e.g. an MCP stdio server).
 func (s *Service) StartAsync(ctx context.Context, input CreateJobInput) (*domain.Job, error) {
+	job, err := s.prepareJob(input)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.startPreparedJobAsync(ctx, job); err != nil {
+		return nil, err
+	}
+	return job, nil
+}
+
+func (s *Service) StartChain(ctx context.Context, goals []domain.ChainGoal, workspaceDir string) (*domain.JobChain, error) {
+	if err := ValidateWorkspaceDir(workspaceDir); err != nil {
+		return nil, err
+	}
+	if len(goals) == 0 {
+		return nil, fmt.Errorf("at least one chain goal is required")
+	}
+
+	now := time.Now().UTC()
+	chain := &domain.JobChain{
+		ID:           newChainID(now),
+		Goals:        make([]domain.ChainGoal, len(goals)),
+		CurrentIndex: 0,
+		Status:       "running",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	for i, goal := range goals {
+		chain.Goals[i] = domain.ChainGoal{
+			Goal:            strings.TrimSpace(goal.Goal),
+			Provider:        goal.Provider,
+			StrictnessLevel: normalizeStrictnessLevel(goal.StrictnessLevel),
+			ContextMode:     normalizeContextMode(goal.ContextMode),
+			MaxSteps:        goal.MaxSteps,
+			Status:          "pending",
+		}
+		if chain.Goals[i].Goal == "" {
+			return nil, fmt.Errorf("goals[%d].goal is required", i)
+		}
+		if chain.Goals[i].Provider == "" {
+			chain.Goals[i].Provider = domain.ProviderMock
+		}
+		if chain.Goals[i].MaxSteps <= 0 {
+			chain.Goals[i].MaxSteps = 8
+		}
+	}
+
+	if err := s.state.SaveChain(ctx, chain); err != nil {
+		return nil, err
+	}
+	if err := s.startChainGoal(ctx, chain, workspaceDir, 0); err != nil {
+		return nil, err
+	}
+	return chain, nil
+}
+
+func (s *Service) prepareJob(input CreateJobInput) (*domain.Job, error) {
 	now := time.Now().UTC()
 	if input.MaxSteps <= 0 {
 		input.MaxSteps = 8
@@ -152,36 +181,89 @@ func (s *Service) StartAsync(ctx context.Context, input CreateJobInput) (*domain
 	roleProfiles := input.RoleProfiles.Normalize(input.Provider)
 
 	job := &domain.Job{
-		ID:              newJobID(now),
-		Goal:            strings.TrimSpace(input.Goal),
-		TechStack:       strings.TrimSpace(input.TechStack),
-		WorkspaceDir:    firstNonEmpty(strings.TrimSpace(input.WorkspaceDir), s.workspaceRoot),
-		Constraints:     input.Constraints,
-		DoneCriteria:    input.DoneCriteria,
-		StrictnessLevel: normalizeStrictnessLevel(input.StrictnessLevel),
-		ContextMode:     normalizeContextMode(input.ContextMode),
-		RoleProfiles:    roleProfiles,
-		Status:          domain.JobStatusStarting,
-		Provider:        input.Provider,
-		MaxSteps:        input.MaxSteps,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:                   newJobID(now),
+		Goal:                 strings.TrimSpace(input.Goal),
+		TechStack:            strings.TrimSpace(input.TechStack),
+		WorkspaceDir:         firstNonEmpty(strings.TrimSpace(input.WorkspaceDir), s.workspaceRoot),
+		Constraints:          input.Constraints,
+		DoneCriteria:         input.DoneCriteria,
+		StrictnessLevel:      normalizeStrictnessLevel(input.StrictnessLevel),
+		ContextMode:          normalizeContextMode(input.ContextMode),
+		RoleProfiles:         roleProfiles,
+		ChainID:              strings.TrimSpace(input.ChainID),
+		ChainGoalIndex:       input.ChainGoalIndex,
+		Status:               domain.JobStatusStarting,
+		Provider:             input.Provider,
+		MaxSteps:             input.MaxSteps,
+		CreatedAt:            now,
+		UpdatedAt:            now,
+		LeaderContextSummary: fmt.Sprintf("Goal: %s", strings.TrimSpace(input.Goal)),
 	}
 	if err := ValidateWorkspaceDir(job.WorkspaceDir); err != nil {
 		return nil, err
 	}
-	job.LeaderContextSummary = fmt.Sprintf("Goal: %s", job.Goal)
-	s.addEvent(job, "job_created", "job created")
+	return job, nil
+}
 
+func (s *Service) startPreparedJob(ctx context.Context, job *domain.Job) (*domain.Job, error) {
+	s.addEvent(job, "job_created", "job created")
 	if err := s.state.SaveJob(ctx, job); err != nil {
 		return nil, err
 	}
+	return s.runLoop(ctx, job)
+}
 
-	// Snapshot the ID before handing job to the goroutine to avoid a data race.
+func (s *Service) startPreparedJobAsync(ctx context.Context, job *domain.Job) error {
+	s.addEvent(job, "job_created", "job created")
+	if err := s.state.SaveJob(ctx, job); err != nil {
+		return err
+	}
 	go func() {
 		s.runLoop(context.Background(), job) //nolint:errcheck
 	}()
-	return job, nil
+	return nil
+}
+
+func (s *Service) startChainGoal(ctx context.Context, chain *domain.JobChain, workspaceDir string, index int) error {
+	if index < 0 || index >= len(chain.Goals) {
+		return fmt.Errorf("chain goal index out of range: %d", index)
+	}
+	goal := &chain.Goals[index]
+	job, err := s.prepareJob(CreateJobInput{
+		Goal:            goal.Goal,
+		Provider:        goal.Provider,
+		WorkspaceDir:    workspaceDir,
+		MaxSteps:        goal.MaxSteps,
+		StrictnessLevel: goal.StrictnessLevel,
+		ContextMode:     goal.ContextMode,
+		RoleProfiles:    domain.DefaultRoleProfiles(goal.Provider),
+		ChainID:         chain.ID,
+		ChainGoalIndex:  index,
+	})
+	if err != nil {
+		goal.Status = "failed"
+		chain.Status = "failed"
+		s.touchChain(chain)
+		_ = s.state.SaveChain(ctx, chain)
+		return err
+	}
+
+	goal.JobID = job.ID
+	goal.Status = "running"
+	chain.CurrentIndex = index
+	chain.Status = "running"
+	s.touchChain(chain)
+	if err := s.state.SaveChain(ctx, chain); err != nil {
+		return err
+	}
+	if err := s.startPreparedJobAsync(ctx, job); err != nil {
+		goal.Status = "failed"
+		chain.Status = "failed"
+		s.touchChain(chain)
+		_ = s.state.SaveChain(ctx, chain)
+		return err
+	}
+	return nil
 }
 
 func (s *Service) Resume(ctx context.Context, jobID string) (*domain.Job, error) {
@@ -217,6 +299,9 @@ func (s *Service) Cancel(ctx context.Context, jobID, reason string) (*domain.Job
 	s.addEvent(job, "job_cancelled", job.BlockedReason)
 	s.touch(job)
 	if err := s.state.SaveJob(ctx, job); err != nil {
+		return nil, err
+	}
+	if err := s.handleChainTerminalState(ctx, job); err != nil {
 		return nil, err
 	}
 	return job, nil
@@ -303,11 +388,18 @@ func (s *Service) Reject(ctx context.Context, jobID, reason string) (*domain.Job
 	if err := s.state.SaveJob(ctx, job); err != nil {
 		return nil, err
 	}
+	if err := s.handleChainTerminalState(ctx, job); err != nil {
+		return nil, err
+	}
 	return job, nil
 }
 
 func (s *Service) Get(ctx context.Context, jobID string) (*domain.Job, error) {
 	return s.state.LoadJob(ctx, jobID)
+}
+
+func (s *Service) GetChain(ctx context.Context, chainID string) (*domain.JobChain, error) {
+	return s.state.LoadChain(ctx, chainID)
 }
 
 func (s *Service) StartHarnessProcess(ctx context.Context, req runtimeexec.StartRequest) (runtimeexec.ProcessHandle, error) {
@@ -440,6 +532,89 @@ func (s *Service) ListJobHarnessProcesses(ctx context.Context, jobID string) ([]
 
 func (s *Service) List(ctx context.Context) ([]domain.Job, error) {
 	return s.state.ListJobs(ctx)
+}
+
+func (s *Service) ListChains(ctx context.Context) ([]*domain.JobChain, error) {
+	chains, err := s.state.ListChains(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*domain.JobChain, 0, len(chains))
+	for i := range chains {
+		chain := chains[i]
+		out = append(out, &chain)
+	}
+	return out, nil
+}
+
+func (s *Service) advanceChain(ctx context.Context, chain *domain.JobChain) error {
+	if chain == nil || chain.Status == "failed" || chain.Status == "done" {
+		return nil
+	}
+	if chain.CurrentIndex < 0 || chain.CurrentIndex >= len(chain.Goals) {
+		return fmt.Errorf("chain current index out of range: %d", chain.CurrentIndex)
+	}
+
+	current := &chain.Goals[chain.CurrentIndex]
+	if current.JobID == "" {
+		return fmt.Errorf("chain goal %d has no job id", chain.CurrentIndex)
+	}
+	job, err := s.state.LoadJob(ctx, current.JobID)
+	if err != nil {
+		return err
+	}
+
+	switch job.Status {
+	case domain.JobStatusDone:
+		current.Status = "done"
+		if chain.CurrentIndex == len(chain.Goals)-1 {
+			chain.Status = "done"
+			s.touchChain(chain)
+			return s.state.SaveChain(ctx, chain)
+		}
+		s.touchChain(chain)
+		if err := s.state.SaveChain(ctx, chain); err != nil {
+			return err
+		}
+		return s.startChainGoal(ctx, chain, job.WorkspaceDir, chain.CurrentIndex+1)
+	case domain.JobStatusBlocked, domain.JobStatusFailed:
+		current.Status = "failed"
+		chain.Status = "failed"
+		s.touchChain(chain)
+		return s.state.SaveChain(ctx, chain)
+	default:
+		return nil
+	}
+}
+
+func (s *Service) handleChainCompletion(ctx context.Context, job *domain.Job) error {
+	if strings.TrimSpace(job.ChainID) == "" {
+		return nil
+	}
+	chain, err := s.state.LoadChain(ctx, job.ChainID)
+	if err != nil {
+		return err
+	}
+	return s.advanceChain(ctx, chain)
+}
+
+func (s *Service) handleChainTerminalState(ctx context.Context, job *domain.Job) error {
+	if strings.TrimSpace(job.ChainID) == "" {
+		return nil
+	}
+	chain, err := s.state.LoadChain(ctx, job.ChainID)
+	if err != nil {
+		return err
+	}
+	if chain.Status == "failed" || chain.Status == "done" {
+		return nil
+	}
+	if job.ChainGoalIndex >= 0 && job.ChainGoalIndex < len(chain.Goals) {
+		chain.Goals[job.ChainGoalIndex].Status = "failed"
+	}
+	chain.Status = "failed"
+	s.touchChain(chain)
+	return s.state.SaveChain(ctx, chain)
 }
 
 func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, error) {
@@ -577,6 +752,9 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 			s.addEvent(job, "job_completed", leader.Reason)
 			s.touch(job)
 			if err := s.state.SaveJob(ctx, job); err != nil {
+				return nil, err
+			}
+			if err := s.handleChainCompletion(ctx, job); err != nil {
 				return nil, err
 			}
 			return job, nil
@@ -826,6 +1004,9 @@ func (s *Service) failJob(ctx context.Context, job *domain.Job, reason string) (
 	if err := s.state.SaveJob(ctx, job); err != nil {
 		return nil, err
 	}
+	if err := s.handleChainTerminalState(ctx, job); err != nil {
+		return nil, err
+	}
 	return job, nil
 }
 
@@ -846,6 +1027,9 @@ func (s *Service) blockJobWithEvent(ctx context.Context, job *domain.Job, eventK
 	s.addEvent(job, eventKind, reason)
 	s.touch(job)
 	if err := s.state.SaveJob(ctx, job); err != nil {
+		return nil, err
+	}
+	if err := s.handleChainTerminalState(ctx, job); err != nil {
 		return nil, err
 	}
 	return job, nil
@@ -1206,8 +1390,16 @@ func (s *Service) touch(job *domain.Job) {
 	job.UpdatedAt = time.Now().UTC()
 }
 
+func (s *Service) touchChain(chain *domain.JobChain) {
+	chain.UpdatedAt = time.Now().UTC()
+}
+
 func newJobID(now time.Time) string {
 	return fmt.Sprintf("job-%s", now.Format("20060102-150405.000"))
+}
+
+func newChainID(now time.Time) string {
+	return fmt.Sprintf("chain-%s", now.Format("20060102-150405.000"))
 }
 
 func (s *Service) buildSystemRequest(job domain.Job, leader domain.LeaderOutput) (runtimeexec.Request, policy.Request, error) {
