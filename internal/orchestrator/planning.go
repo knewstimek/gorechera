@@ -60,10 +60,12 @@ func (s *Service) persistPlanning(ctx context.Context, job *domain.Job, planning
 }
 
 func (s *Service) runPlannerPhase(ctx context.Context, job *domain.Job) (domain.PlanningArtifact, error) {
-	raw, err := s.sessions.RunPlanner(ctx, *job)
+	phaseJob := *job
+	raw, err := s.sessions.RunPlanner(ctx, phaseJob)
 	if err != nil {
 		return domain.PlanningArtifact{}, err
 	}
+	s.accumulateTokenUsage(job, phaseJob.CurrentStep, estimateProviderUsage(raw, phaseJob))
 	var out domain.PlanningArtifact
 	if err := json.Unmarshal([]byte(raw), &out); err != nil {
 		return domain.PlanningArtifact{}, err

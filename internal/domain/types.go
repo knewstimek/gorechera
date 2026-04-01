@@ -215,6 +215,13 @@ type VerificationReport struct {
 	ContractRef   string   `json:"contract_ref,omitempty"`
 }
 
+type TokenUsage struct {
+	InputTokens      int     `json:"input_tokens"`
+	OutputTokens     int     `json:"output_tokens"`
+	TotalTokens      int     `json:"total_tokens"`
+	EstimatedCostUSD float64 `json:"estimated_cost_usd"`
+}
+
 type EvaluatorReport struct {
 	Status           string   `json:"status"`
 	Passed           bool     `json:"passed"`
@@ -263,6 +270,7 @@ type Step struct {
 	Artifacts     []string   `json:"artifacts,omitempty"`
 	BlockedReason string     `json:"blocked_reason,omitempty"`
 	ErrorReason   string     `json:"error_reason,omitempty"`
+	TokenUsage    TokenUsage `json:"token_usage"`
 	StartedAt     time.Time  `json:"started_at"`
 	FinishedAt    time.Time  `json:"finished_at"`
 }
@@ -291,6 +299,7 @@ type Job struct {
 	PendingApproval         *PendingApproval      `json:"pending_approval,omitempty"`
 	Summary                 string                `json:"summary,omitempty"`
 	LeaderContextSummary    string                `json:"leader_context_summary,omitempty"`
+	TokenUsage              TokenUsage            `json:"token_usage"`
 	Steps                   []Step                `json:"steps,omitempty"`
 	Events                  []Event               `json:"events,omitempty"`
 	CreatedAt               time.Time             `json:"created_at"`

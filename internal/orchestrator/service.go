@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"gorechera/internal/domain"
 	"gorechera/internal/policy"
@@ -24,6 +25,7 @@ var ErrHarnessOwnershipMismatch = errors.New("harness process not owned by job")
 const (
 	providerRetryLimit     = 3
 	providerRetryBaseDelay = 250 * time.Millisecond
+	roughCostPerTokenUSD   = 0.000001
 )
 
 // EventNotification carries a job state change that the MCP server can relay
@@ -467,6 +469,7 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 			}
 			return s.failJob(ctx, job, fmt.Sprintf("leader execution failed: %v", err))
 		}
+		s.accumulateTokenUsage(job, job.CurrentStep, estimateProviderUsage(rawLeader, *job))
 
 		var leader domain.LeaderOutput
 		if err := json.Unmarshal([]byte(rawLeader), &leader); err != nil {
@@ -605,6 +608,7 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 		_, failErr := s.failJob(ctx, job, last.ErrorReason)
 		return failErr
 	}
+	s.accumulateTokenUsage(job, step.Index, estimateProviderUsage(rawWorker, *job, task))
 
 	var worker domain.WorkerOutput
 	if err := json.Unmarshal([]byte(rawWorker), &worker); err != nil {
@@ -801,6 +805,81 @@ func (s *Service) executeProviderPhase(ctx context.Context, job *domain.Job, pha
 		}
 		return "", action, err
 	}
+}
+
+func estimateTokens(input, output string) domain.TokenUsage {
+	inputTokens := estimateTokenCount(input)
+	outputTokens := estimateTokenCount(output)
+	totalTokens := inputTokens + outputTokens
+	return domain.TokenUsage{
+		InputTokens:      inputTokens,
+		OutputTokens:     outputTokens,
+		TotalTokens:      totalTokens,
+		EstimatedCostUSD: float64(totalTokens) * roughCostPerTokenUSD,
+	}
+}
+
+func estimateProviderUsage(output string, inputs ...any) domain.TokenUsage {
+	return estimateTokens(buildTokenUsageInput(inputs...), output)
+}
+
+func buildTokenUsageInput(inputs ...any) string {
+	if len(inputs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for i, input := range inputs {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		switch value := input.(type) {
+		case string:
+			b.WriteString(value)
+		default:
+			raw, err := json.Marshal(value)
+			if err != nil {
+				b.WriteString(fmt.Sprintf("%v", value))
+				continue
+			}
+			b.Write(raw)
+		}
+	}
+	return b.String()
+}
+
+func estimateTokenCount(text string) int {
+	charCount := utf8.RuneCountInString(text)
+	if charCount == 0 {
+		return 0
+	}
+	return (charCount + 3) / 4
+}
+
+func (s *Service) accumulateTokenUsage(job *domain.Job, stepIndex int, usage domain.TokenUsage) {
+	job.TokenUsage = mergeTokenUsage(job.TokenUsage, usage)
+	if step := stepByIndex(job, stepIndex); step != nil {
+		step.TokenUsage = mergeTokenUsage(step.TokenUsage, usage)
+	}
+}
+
+func mergeTokenUsage(current, delta domain.TokenUsage) domain.TokenUsage {
+	current.InputTokens += delta.InputTokens
+	current.OutputTokens += delta.OutputTokens
+	current.TotalTokens += delta.TotalTokens
+	current.EstimatedCostUSD += delta.EstimatedCostUSD
+	return current
+}
+
+func stepByIndex(job *domain.Job, stepIndex int) *domain.Step {
+	if stepIndex <= 0 {
+		return nil
+	}
+	for i := range job.Steps {
+		if job.Steps[i].Index == stepIndex {
+			return &job.Steps[i]
+		}
+	}
+	return nil
 }
 
 func providerActionForError(err error) provider.ProviderErrorAction {

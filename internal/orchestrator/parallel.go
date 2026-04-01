@@ -34,6 +34,7 @@ type parallelWorkerResult struct {
 	Plan          parallelWorkerPlan
 	Worker        domain.WorkerOutput
 	ArtifactPaths []string
+	TokenUsage    domain.TokenUsage
 	Err           error
 }
 
@@ -271,6 +272,7 @@ func (s *Service) runParallelWorkerPlans(ctx context.Context, job *domain.Job, p
 	for i := range results {
 		res := results[i]
 		step := &job.Steps[start+i]
+		s.accumulateTokenUsage(job, step.Index, res.TokenUsage)
 		step.FinishedAt = time.Now().UTC()
 		if res.Err != nil {
 			step.Status = domain.StepStatusFailed
@@ -343,24 +345,26 @@ func (s *Service) executeParallelWorkerPlan(ctx context.Context, job domain.Job,
 	if err != nil {
 		return parallelWorkerResult{Plan: plan, Err: fmt.Errorf("worker execution failed: %w", err)}
 	}
+	usage := estimateProviderUsage(rawWorker, job, task)
 
 	var worker domain.WorkerOutput
 	if err := json.Unmarshal([]byte(rawWorker), &worker); err != nil {
-		return parallelWorkerResult{Plan: plan, Err: fmt.Errorf("invalid worker json: %w", err)}
+		return parallelWorkerResult{Plan: plan, TokenUsage: usage, Err: fmt.Errorf("invalid worker json: %w", err)}
 	}
 	if err := schema.ValidateWorkerOutput(worker); err != nil {
-		return parallelWorkerResult{Plan: plan, Err: fmt.Errorf("worker schema validation failed: %w", err)}
+		return parallelWorkerResult{Plan: plan, TokenUsage: usage, Err: fmt.Errorf("worker schema validation failed: %w", err)}
 	}
 
 	artifacts, err := s.artifacts.MaterializeWorkerArtifacts(job.ID, plan.StepIndex, worker)
 	if err != nil {
-		return parallelWorkerResult{Plan: plan, Err: fmt.Errorf("artifact materialization failed: %w", err)}
+		return parallelWorkerResult{Plan: plan, TokenUsage: usage, Err: fmt.Errorf("artifact materialization failed: %w", err)}
 	}
 
 	return parallelWorkerResult{
 		Plan:          plan,
 		Worker:        worker,
 		ArtifactPaths: artifacts,
+		TokenUsage:    usage,
 	}
 }
 

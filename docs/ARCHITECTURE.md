@@ -5,7 +5,7 @@
 ```
 cmd/gorechera/main.go           -- CLI entrypoint, flag parsing, command routing
 internal/
-  domain/types.go               -- ALL domain types (Job, Step, Event, LeaderOutput, WorkerOutput, etc.)
+  domain/types.go               -- ALL domain types (Job, Step, TokenUsage, Event, LeaderOutput, WorkerOutput, etc.)
   orchestrator/
     service.go                  -- Core: runLoop, Start/Resume/Cancel/Retry/Approve/Reject, harness mgmt
     planning.go                 -- Planner phase, buildPlanningArtifact, buildSprintContract
@@ -60,14 +60,16 @@ Step: pending -> active -> succeeded / blocked / failed / skipped
 1. ensurePlanning()
    - Run planner phase (provider-backed)
    - Generate: product_spec.md, execution_plan.json, sprint_contract.json, verification_contract.json
+   - Rough token/cost usage is estimated from serialized phase input + raw provider output and accumulated on the job (and current step when one exists)
    - If planner unsupported (ErrorKindUnsupportedPhase): fall back to hardcoded planning artifact (BUG-2)
 
 2. for job.CurrentStep < job.MaxSteps:
    a. Set status = waiting_leader, save
    b. Call sessions.RunLeader(job) -> raw JSON
-   c. Unmarshal + validate LeaderOutput
-   d. NOTE: JSON parse failure or validation failure -> immediate failJob (NOT re-request as spec says)
-   e. Switch on leader.Action:
+   c. Estimate rough token usage at 1 token / 4 chars for input and output, then accumulate it on Job.TokenUsage and the current Step.TokenUsage when applicable
+   d. Unmarshal + validate LeaderOutput
+   e. NOTE: JSON parse failure or validation failure -> immediate failJob (NOT re-request as spec says)
+   f. Switch on leader.Action:
       - run_worker:  -> runWorkerStep -> buildWorkerPlans -> single worker execution
       - run_workers: -> runWorkerStep -> buildWorkerPlans -> runParallelWorkerPlans (goroutine per plan)
       - run_system:  -> runSystemStep -> buildSystemRequest -> approval check -> runtime.Run
@@ -115,6 +117,8 @@ protocol.go defines:
 
 Claude adapter passes schema via `--json-schema` CLI flag.
 Codex adapter writes schema to temp file, passes via `--output-schema` flag.
+
+The orchestrator stores rough token usage by estimating serialized prompt/input text and raw provider output at 1 token per 4 characters. Estimated cost is a heuristic only, not provider billing.
 
 NOTE: prompts inject the ENTIRE job JSON (`json.MarshalIndent(job, "", "  ")`). This means all steps, events, artifacts are included. For large jobs this will be very large.
 

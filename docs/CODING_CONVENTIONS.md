@@ -53,6 +53,7 @@ Schemas: use `*Schema()` functions in protocol.go.
 
 All Run* methods return (string, error) where string is raw JSON.
 Orchestrator handles unmarshal + validation.
+Rough token/cost accounting stays in orchestrator code. Keep adapters billing-agnostic and do not add provider-specific pricing logic.
 
 ## Schema Validation
 

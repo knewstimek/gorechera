@@ -54,6 +54,7 @@ All known bugs have been fixed (2026-04-02, TOCTOU fixed separately).
 - Verification contract surface (read-only, derived from sprint contract + evaluator evidence)
 - Pending approval state for blocked system actions + operator approve/reject
 - Worker artifact real content storage via FileContents field
+- Rough token/cost tracking on job + step state using serialized input/output heuristics (1 token / 4 chars, non-billing estimate)
 - Normal strictness evaluator gate: `implement` required, `review` optional, rule-based override for provider blocked
 - Claude adapter real integration (planner/leader/worker confirmed, --permission-mode dontAsk, --json-schema, stdin prompt)
 - Codex adapter real integration (GPT full pipeline done convergence achieved, stdin prompt, workspace-write sandbox)
