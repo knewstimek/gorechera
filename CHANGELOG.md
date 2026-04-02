@@ -1,5 +1,30 @@
 # Changelog
 
+## v2026.04.03
+
+### Added
+- Worktree notification: terminal notifications for isolated worktree jobs include workspace_mode, workspace_dir, requested_workspace_dir, diff_stat
+- PendingApproval guard: ResumeWithOptions rejects resume on jobs with pending approval (must use approve/reject)
+- Orchestrator-specific audit checklist in CLAUDE.md (evaluator gate bypass, approval policy bypass)
+- Supervisor Guide (docs/SUPERVISOR_GUIDE.md): goal writing, ambition levels, invariants, provider presets, operational tips
+
+### Fixed
+- Flaky test: TestToolStatusWaitReturnsBlockedForOperatorCancellation -- sync Cancel + wait=false snapshot
+
+### Security (Audit V3: 3 HIGH, 4 MEDIUM, 2 LOW fixed)
+- H1: Provider CLI environment allowlist (providerEnv) -- was leaking full parent env including API keys
+- H2: Lease file path traversal guard (validateLeaseID)
+- H3: gorchera_diff pathspec injection block (reject .. and : magic)
+- M1: SSE stream termination on blocked/cancelled jobs
+- M2: Atomic write TOCTOU fix -- .bak rename pattern instead of remove+rename
+- M3: rg removed from CategoryCommand (restrict to CategorySearch)
+- M4: git diff --stat 10s timeout via exec.CommandContext
+- L1: API error messages sanitized -- no internal paths exposed to client
+- L2: listenEvents goroutine leak fixed with done channel
+
+### Changed
+- CLAUDE.md cleaned up, README streamlined
+
 ## v2026.04.03-rc3
 
 ### Added
