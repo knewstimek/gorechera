@@ -1,5 +1,47 @@
 # Changelog
 
+## v2026.04.03-rc3
+
+### Added
+- Context compaction: role-specific compact payloads for executor/reviewer/evaluator (30-40% token reduction per call)
+  - Executor: receives workspace info + previous failure only (not full job JSON)
+  - Reviewer: receives step summaries + diff evidence + contract (not full job JSON)
+  - Evaluator: receives compact step summaries + role profiles (not raw step data)
+  - Director keeps full job state for planning+dispatch
+- Evaluator gate consistency check: evaluatorTextContradicts() detects failure language in evaluator text that contradicts passed=true, demotes to failed as final override
+- Provider preset profiles in examples/role-profiles.sample.json (cross-provider, codex-only, claude-only, balanced, full strict)
+
+### Fixed
+- Evaluator gate bypass: evaluator could say "gate failure, not a pass" while passed=true and job would still complete as done
+- pipeline_mode default changed from balanced to light (skip reviewer for simple tasks)
+
+### Changed
+- MCP tool descriptions updated for 4-role pipeline architecture
+- README "Note on Overhead" replaced with "Pipeline Modes" section explaining light/balanced/full
+
+## v2026.04.03-rc2
+
+### Added
+- Pipeline architecture redesign: 6-role -> 4-role (director/executor/reviewer/evaluator)
+  - director = planner + leader merged (single AI call for plan+dispatch)
+  - tester role removed; engine runs go build/test automatically after executor (rule-based, not AI)
+  - Engine verification: build/test results stored as step artifacts, consumed by evaluator
+- pipeline_mode parameter: light (skip reviewer) / balanced (default) / full (fix loops + parallel workers)
+- resume extra_steps (1-20 bounded) for blocked max_steps_exceeded jobs
+- Terminal notification: JSON-RPC 2.0 notifications/job_terminal on done/failed/blocked
+  - Cancel race fix: notify only from final persisted terminal state
+  - Startup recovery buffering: queue notifications until callback registered + writer installed
+- role_overrides added to gorchera_start_job MCP schema (was only in start_chain)
+- Legacy job compatibility: jobs without engine artifacts pass evaluator (no retroactive blocking)
+
+### Fixed
+- MCP reflect path for ResumeWithOptions (was looking for wrong method name)
+- Parallel engine verification SaveJob after failure (crash-safe step state)
+
+### Changed
+- Evaluator step coverage is now pipeline_mode-aware (light requires implement only, balanced adds review)
+- DefaultRoleProfiles: tester slot reuses executor profile for backward compatibility
+
 ## v2026.04.03-rc1
 
 ### Added
