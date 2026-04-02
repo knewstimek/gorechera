@@ -215,9 +215,10 @@ type ChainGoal struct {
 	Provider        ProviderName `json:"provider"`
 	StrictnessLevel string       `json:"strictness_level,omitempty"`
 	ContextMode     string       `json:"context_mode,omitempty"`
-	MaxSteps        int          `json:"max_steps"`
-	JobID           string       `json:"job_id,omitempty"`
-	Status          string       `json:"status"`
+	MaxSteps        int                    `json:"max_steps"`
+	RoleOverrides   map[string]RoleProfile `json:"role_overrides,omitempty"`
+	JobID           string                 `json:"job_id,omitempty"`
+	Status          string                 `json:"status"`
 }
 
 type JobChain struct {

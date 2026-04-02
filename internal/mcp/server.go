@@ -238,6 +238,18 @@ func toolList() []toolDef {
 								"strictness_level": {Type: "string", Description: "Evaluator strictness: strict | normal | lenient", Default: "normal"},
 								"context_mode":     {Type: "string", Description: "Leader context mode: full | summary | minimal", Default: "full"},
 								"max_steps":        {Type: "integer", Description: "Maximum leader steps for this goal", Default: 8},
+								"role_overrides": {
+									Type:        "object",
+									Description: "Per-role provider/model overrides for this chain step",
+									Properties: map[string]schemaProp{
+										"planner":   {Type: "object", Properties: map[string]schemaProp{"provider": {Type: "string"}, "model": {Type: "string"}}},
+										"leader":    {Type: "object", Properties: map[string]schemaProp{"provider": {Type: "string"}, "model": {Type: "string"}}},
+										"executor":  {Type: "object", Properties: map[string]schemaProp{"provider": {Type: "string"}, "model": {Type: "string"}}},
+										"reviewer":  {Type: "object", Properties: map[string]schemaProp{"provider": {Type: "string"}, "model": {Type: "string"}}},
+										"tester":    {Type: "object", Properties: map[string]schemaProp{"provider": {Type: "string"}, "model": {Type: "string"}}},
+										"evaluator": {Type: "object", Properties: map[string]schemaProp{"provider": {Type: "string"}, "model": {Type: "string"}}},
+									},
+								},
 							},
 							Required: []string{"goal"},
 						},
@@ -553,6 +565,11 @@ func (s *Server) toolStartChain(ctx context.Context, args map[string]any) (toolR
 			ContextMode:     stringArgDefault(goalMap, "context_mode", "full"),
 			MaxSteps:        intArgDefault(goalMap, "max_steps", 8),
 		}
+		if roRaw, ok := goalMap["role_overrides"]; ok {
+			if roMap, ok := roRaw.(map[string]any); ok {
+				goal.RoleOverrides = parseRoleOverrides(roMap)
+			}
+		}
 		if strings.TrimSpace(goal.Goal) == "" {
 			return toolResult{}, fmt.Errorf("goals[%d].goal is required", i)
 		}
@@ -564,6 +581,28 @@ func (s *Server) toolStartChain(ctx context.Context, args map[string]any) (toolR
 		return toolResult{}, err
 	}
 	return jsonResult(map[string]any{"chain_id": chain.ID})
+}
+
+// parseRoleOverrides converts a raw map[string]any (from JSON) into a typed
+// map[string]domain.RoleProfile. Keys that are not valid role names or whose
+// values cannot be type-asserted are silently skipped.
+func parseRoleOverrides(raw map[string]any) map[string]domain.RoleProfile {
+	result := make(map[string]domain.RoleProfile, len(raw))
+	for role, val := range raw {
+		m, ok := val.(map[string]any)
+		if !ok {
+			continue
+		}
+		var rp domain.RoleProfile
+		if p, ok := m["provider"].(string); ok {
+			rp.Provider = domain.ProviderName(p)
+		}
+		if model, ok := m["model"].(string); ok {
+			rp.Model = model
+		}
+		result[role] = rp
+	}
+	return result
 }
 
 func (s *Server) toolListJobs(ctx context.Context) (toolResult, error) {

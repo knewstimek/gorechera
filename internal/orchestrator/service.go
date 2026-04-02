@@ -165,6 +165,7 @@ func (s *Service) StartChain(ctx context.Context, goals []domain.ChainGoal, work
 			StrictnessLevel: normalizeStrictnessLevel(goal.StrictnessLevel),
 			ContextMode:     normalizeContextMode(goal.ContextMode),
 			MaxSteps:        goal.MaxSteps,
+			RoleOverrides:   goal.RoleOverrides,
 			Status:          domain.ChainGoalStatusPending,
 		}
 		if chain.Goals[i].Goal == "" {
@@ -255,6 +256,7 @@ func (s *Service) startChainGoal(ctx context.Context, chain *domain.JobChain, wo
 		StrictnessLevel: goal.StrictnessLevel,
 		ContextMode:     goal.ContextMode,
 		RoleProfiles:    domain.DefaultRoleProfiles(goal.Provider),
+		RoleOverrides:   goal.RoleOverrides,
 		ChainID:         chain.ID,
 		ChainGoalIndex:  index,
 	})
