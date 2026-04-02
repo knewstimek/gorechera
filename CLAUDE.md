@@ -49,6 +49,24 @@ go test ./...
 - `internal/provider/provider.go` -- 어댑터 인터페이스
 - `internal/provider/protocol.go` -- 프롬프트/스키마
 
+## 기본 Role Profile (감독관 권장)
+
+provider=codex 기준, executor/reviewer/tester만 claude sonnet으로 override:
+
+```json
+{
+  "provider": "codex",
+  "role_overrides": {
+    "executor":  {"provider": "claude", "model": "sonnet"},
+    "reviewer":  {"provider": "claude", "model": "sonnet"},
+    "tester":    {"provider": "claude", "model": "sonnet"}
+  }
+}
+```
+
+결과: planner/leader/evaluator = GPT 5.4, executor/reviewer/tester = Claude Sonnet.
+GPT가 계획/판단, Claude가 실행/검토. 토큰 효율 + 크로스체크 효과.
+
 ## 감독관 Goal 작성 가이드
 
 Goal의 품질이 job 결과를 결정한다. "XSS 고쳐" 같은 짧은 goal은 기계적 실행만 유도한다.
