@@ -152,6 +152,11 @@ func workerSchema() string {
 
 func buildPlannerPrompt(job domain.Job) string {
 	payload, _ := json.MarshalIndent(job, "", "  ")
+	chainSection := ""
+	if job.ChainContext != nil && (job.ChainContext.Summary != "" || job.ChainContext.EvaluatorReportRef != "") {
+		chainSection = fmt.Sprintf("\n\n## Previous chain step results\n\nSummary: %s\nEvaluator report: %s\n",
+			job.ChainContext.Summary, job.ChainContext.EvaluatorReportRef)
+	}
 	return strings.TrimSpace(fmt.Sprintf(`
 TASK: You are a planner component operating under an orchestrator supervisor. The supervisor manages the overall workflow, and the leader uses your planning artifacts to coordinate executor, reviewer, and tester workers. You define scope and verification expectations but do not perform implementation yourself.
 The job data below is complete. Plan it now -- do not ask for more input.
@@ -161,7 +166,7 @@ The goal to plan: %s
 
 Full job state:
 %s
-
+%s
 Output requirements (all fields required in JSON):
 - goal: restate the objective concisely
 - summary: one-paragraph plan of how to achieve the goal
@@ -173,7 +178,7 @@ Output requirements (all fields required in JSON):
 - acceptance: array of measurable acceptance criteria
 - success_signals: observable signals that indicate success
 - verification_contract: object with version=1, goal=what to verify, required_artifacts=files that must exist after execution
-`, job.Goal, string(payload)))
+`, job.Goal, string(payload), chainSection))
 }
 
 func buildEvaluatorPrompt(job domain.Job) string {

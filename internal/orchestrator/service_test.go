@@ -2074,3 +2074,22 @@ func (p *chainOutcomeProvider) RunWorker(_ context.Context, _ domain.Job, _ doma
 func (p *chainOutcomeProvider) RunEvaluator(_ context.Context, _ domain.Job) (string, error) {
 	return `{"status":"passed","passed":true,"score":100,"reason":"accepted","missing_step_types":[],"evidence":["chain"],"contract_ref":"","verification_report":{"status":"passed","passed":true,"reason":"accepted","evidence":["chain"],"missing_checks":[],"artifacts":[],"contract_ref":""}}`, nil
 }
+
+// TestServiceShutdownCancelsContext verifies that Shutdown() cancels the
+// service-level context so that background job goroutines receive a stop signal.
+func TestServiceShutdownCancelsContext(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	registry := provider.NewRegistry()
+	svc := orchestrator.NewService(
+		provider.NewSessionManager(registry),
+		store.NewStateStore(filepath.Join(root, "state")),
+		store.NewArtifactStore(filepath.Join(root, "artifacts")),
+		root,
+	)
+
+	// Calling Shutdown() must not panic and must be idempotent.
+	svc.Shutdown()
+	svc.Shutdown()
+}

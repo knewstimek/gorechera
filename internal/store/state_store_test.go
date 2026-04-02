@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,5 +96,123 @@ func TestStateStoreSaveJobOverwritesExistingFile(t *testing.T) {
 	}
 	if loaded.Status != domain.JobStatusRunning {
 		t.Fatalf("expected overwritten job status %q, got %q", domain.JobStatusRunning, loaded.Status)
+	}
+}
+
+// TestValidateIDRejectsTraversalSequences verifies that IDs containing path traversal sequences
+// are rejected before any file-system operation is performed (HIGH-01, HIGH-02).
+func TestValidateIDRejectsTraversalSequences(t *testing.T) {
+	t.Parallel()
+
+	traversalIDs := []string{
+		"../../etc/passwd",
+		`..\..\windows\system32`,
+		"../secret",
+		"..",
+		".",
+		"",
+		"job/malicious",
+		"job\\malicious",
+		"job id with spaces",
+		"job:bad",
+		"job*bad",
+	}
+
+	for _, id := range traversalIDs {
+		id := id
+		t.Run("id="+id, func(t *testing.T) {
+			t.Parallel()
+			if err := validateID(id); err == nil {
+				t.Errorf("validateID(%q) expected error but got nil", id)
+			}
+		})
+	}
+}
+
+// TestValidateIDAcceptsValidIDs verifies that well-formed IDs pass validation.
+func TestValidateIDAcceptsValidIDs(t *testing.T) {
+	t.Parallel()
+
+	validIDs := []string{
+		"job-20260402-072222.097",
+		"chain-20260402-065955.763",
+		"chain-older",
+		"chain-newer",
+		"job-overwrite",
+		"job123",
+		"a",
+		"A_B-C.D",
+	}
+
+	for _, id := range validIDs {
+		id := id
+		t.Run("id="+id, func(t *testing.T) {
+			t.Parallel()
+			if err := validateID(id); err != nil {
+				t.Errorf("validateID(%q) unexpected error: %v", id, err)
+			}
+		})
+	}
+}
+
+// TestStateStoreRejectsTraversalJobID verifies that SaveJob and LoadJob reject traversal IDs.
+func TestStateStoreRejectsTraversalJobID(t *testing.T) {
+	t.Parallel()
+
+	s := NewStateStore(t.TempDir())
+	ctx := context.Background()
+
+	badIDs := []string{"../../etc/passwd", `..\..\windows\system32`, "../secret"}
+	for _, id := range badIDs {
+		id := id
+		t.Run("save_"+id, func(t *testing.T) {
+			t.Parallel()
+			job := &domain.Job{ID: id, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+			err := s.SaveJob(ctx, job)
+			if err == nil {
+				t.Errorf("SaveJob(%q) expected error but got nil", id)
+			}
+			if err != nil && !strings.Contains(err.Error(), "invalid ID") {
+				t.Errorf("SaveJob(%q) expected 'invalid ID' in error, got: %v", id, err)
+			}
+		})
+		t.Run("load_"+id, func(t *testing.T) {
+			t.Parallel()
+			_, err := s.LoadJob(ctx, id)
+			if err == nil {
+				t.Errorf("LoadJob(%q) expected error but got nil", id)
+			}
+			if err != nil && !strings.Contains(err.Error(), "invalid ID") {
+				t.Errorf("LoadJob(%q) expected 'invalid ID' in error, got: %v", id, err)
+			}
+		})
+	}
+}
+
+// TestStateStoreRejectsTraversalChainID verifies that SaveChain and LoadChain reject traversal IDs.
+func TestStateStoreRejectsTraversalChainID(t *testing.T) {
+	t.Parallel()
+
+	s := NewStateStore(t.TempDir())
+	ctx := context.Background()
+
+	badIDs := []string{"../../etc/passwd", `..\..\windows\system32`}
+	for _, id := range badIDs {
+		id := id
+		t.Run("save_"+id, func(t *testing.T) {
+			t.Parallel()
+			chain := &domain.JobChain{ID: id, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+			err := s.SaveChain(ctx, chain)
+			if err == nil {
+				t.Errorf("SaveChain(%q) expected error but got nil", id)
+			}
+		})
+		t.Run("load_"+id, func(t *testing.T) {
+			t.Parallel()
+			_, err := s.LoadChain(ctx, id)
+			if err == nil {
+				t.Errorf("LoadChain(%q) expected error but got nil", id)
+			}
+		})
 	}
 }

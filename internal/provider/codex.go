@@ -96,6 +96,7 @@ func (a *CodexAdapter) runStructured(ctx context.Context, workspaceDir, prompt, 
 	// and to prevent JSON payload characters from being misinterpreted by the shell.
 	args := []string{
 		"exec",
+		"--fresh",
 		"--skip-git-repo-check",
 		"-s", "workspace-write",
 		"--output-schema", schemaPath,

@@ -74,6 +74,48 @@ func TestClaudeAdapterReturnsStructuredResponseWhenExecutableExists(t *testing.T
 	}
 }
 
+func TestClaudeAdapterExtractsStructuredPayloadFromJSONEnvelopes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{
+			name:   "structured_output",
+			output: `{"structured_output":{"status":"success","summary":"ok"}}`,
+			want:   `{"status":"success","summary":"ok"}`,
+		},
+		{
+			name:   "parsed_output",
+			output: `{"parsed_output":{"status":"success","summary":"ok"}}`,
+			want:   `{"status":"success","summary":"ok"}`,
+		},
+		{
+			name:   "object result",
+			output: `{"result":{"status":"success","summary":"ok"}}`,
+			want:   `{"status":"success","summary":"ok"}`,
+		},
+		{
+			name:   "string result",
+			output: `{"result":"{\"status\":\"success\",\"summary\":\"ok\"}"}`,
+			want:   `{"status":"success","summary":"ok"}`,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := extractJSONResult(tc.output); got != tc.want {
+				t.Fatalf("extractJSONResult(%q) = %q, want %q", tc.output, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestCodexAdapterReturnsStructuredResponseWhenExecutableExists(t *testing.T) {
 	t.Parallel()
 
@@ -157,12 +199,13 @@ func TestSessionManagerRunsPlannerAndEvaluatorPhases(t *testing.T) {
 	}
 }
 
-func TestSessionManagerUsesRoleSpecificProviderOverrides(t *testing.T) {
+func TestSessionManagerUsesRoleOverrideProvidersAcrossRoles(t *testing.T) {
 	t.Parallel()
 
 	registry := NewRegistry()
 	for _, name := range []domain.ProviderName{
 		domain.ProviderName("global-provider"),
+		domain.ProviderName("role-profile-provider"),
 		domain.ProviderName("leader-provider"),
 		domain.ProviderName("planner-provider"),
 		domain.ProviderName("evaluator-provider"),
@@ -186,7 +229,10 @@ func TestSessionManagerUsesRoleSpecificProviderOverrides(t *testing.T) {
 			job: domain.Job{
 				Provider: domain.ProviderName("global-provider"),
 				RoleProfiles: domain.RoleProfiles{
-					Leader: domain.ExecutionProfile{Provider: domain.ProviderName("leader-provider")},
+					Leader: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "leader-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"leader": {Provider: domain.ProviderName("leader-provider"), Model: "leader-override-model"},
 				},
 			},
 			run: func(job domain.Job) (string, error) {
@@ -199,7 +245,10 @@ func TestSessionManagerUsesRoleSpecificProviderOverrides(t *testing.T) {
 			job: domain.Job{
 				Provider: domain.ProviderName("global-provider"),
 				RoleProfiles: domain.RoleProfiles{
-					Planner: domain.ExecutionProfile{Provider: domain.ProviderName("planner-provider")},
+					Planner: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "planner-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"planner": {Provider: domain.ProviderName("planner-provider"), Model: "planner-override-model"},
 				},
 			},
 			run: func(job domain.Job) (string, error) {
@@ -212,7 +261,10 @@ func TestSessionManagerUsesRoleSpecificProviderOverrides(t *testing.T) {
 			job: domain.Job{
 				Provider: domain.ProviderName("global-provider"),
 				RoleProfiles: domain.RoleProfiles{
-					Evaluator: domain.ExecutionProfile{Provider: domain.ProviderName("evaluator-provider")},
+					Evaluator: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "evaluator-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"evaluator": {Provider: domain.ProviderName("evaluator-provider"), Model: "evaluator-override-model"},
 				},
 			},
 			run: func(job domain.Job) (string, error) {
@@ -225,7 +277,10 @@ func TestSessionManagerUsesRoleSpecificProviderOverrides(t *testing.T) {
 			job: domain.Job{
 				Provider: domain.ProviderName("global-provider"),
 				RoleProfiles: domain.RoleProfiles{
-					Executor: domain.ExecutionProfile{Provider: domain.ProviderName("executor-provider")},
+					Executor: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "executor-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"executor": {Provider: domain.ProviderName("executor-provider"), Model: "executor-override-model"},
 				},
 			},
 			run: func(job domain.Job) (string, error) {
@@ -238,7 +293,10 @@ func TestSessionManagerUsesRoleSpecificProviderOverrides(t *testing.T) {
 			job: domain.Job{
 				Provider: domain.ProviderName("global-provider"),
 				RoleProfiles: domain.RoleProfiles{
-					Reviewer: domain.ExecutionProfile{Provider: domain.ProviderName("reviewer-provider")},
+					Reviewer: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "reviewer-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"reviewer": {Provider: domain.ProviderName("reviewer-provider"), Model: "reviewer-override-model"},
 				},
 			},
 			run: func(job domain.Job) (string, error) {
@@ -251,7 +309,10 @@ func TestSessionManagerUsesRoleSpecificProviderOverrides(t *testing.T) {
 			job: domain.Job{
 				Provider: domain.ProviderName("global-provider"),
 				RoleProfiles: domain.RoleProfiles{
-					Tester: domain.ExecutionProfile{Provider: domain.ProviderName("tester-provider")},
+					Tester: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "tester-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"tester": {Provider: domain.ProviderName("tester-provider"), Model: "tester-override-model"},
 				},
 			},
 			run: func(job domain.Job) (string, error) {
@@ -269,6 +330,141 @@ func TestSessionManagerUsesRoleSpecificProviderOverrides(t *testing.T) {
 			got, err := tc.run(tc.job)
 			if err != nil {
 				t.Fatalf("expected override provider to succeed, got error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("expected %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestSessionManagerRoleOverridesFallBackCleanly(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	for _, name := range []domain.ProviderName{
+		domain.ProviderName("global-provider"),
+		domain.ProviderName("role-profile-provider"),
+		domain.ProviderName("leader-override-provider"),
+		domain.ProviderName("executor-override-provider"),
+		domain.ProviderName("tester-override-provider"),
+	} {
+		registry.Register(profileEchoAdapter{name: name})
+	}
+	manager := NewSessionManager(registry)
+
+	cases := []struct {
+		name string
+		job  domain.Job
+		run  func(domain.Job) (string, error)
+		want string
+	}{
+		{
+			name: "leader override provider keeps role profile model",
+			job: domain.Job{
+				Provider: domain.ProviderName("global-provider"),
+				RoleProfiles: domain.RoleProfiles{
+					Leader: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "leader-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"leader": {Provider: domain.ProviderName("leader-override-provider")},
+				},
+			},
+			run: func(job domain.Job) (string, error) {
+				return manager.RunLeader(context.Background(), job)
+			},
+			want: "leader-override-provider:leader:leader-profile-model",
+		},
+		{
+			name: "planner override model keeps role profile provider",
+			job: domain.Job{
+				Provider: domain.ProviderName("global-provider"),
+				RoleProfiles: domain.RoleProfiles{
+					Planner: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "planner-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"planner": {Model: "planner-override-model"},
+				},
+			},
+			run: func(job domain.Job) (string, error) {
+				return manager.RunPlanner(context.Background(), job)
+			},
+			want: "role-profile-provider:planner:planner-override-model",
+		},
+		{
+			name: "evaluator override model keeps job provider when role provider empty",
+			job: domain.Job{
+				Provider: domain.ProviderName("global-provider"),
+				RoleProfiles: domain.RoleProfiles{
+					Evaluator: domain.ExecutionProfile{Model: "evaluator-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"evaluator": {Model: "evaluator-override-model"},
+				},
+			},
+			run: func(job domain.Job) (string, error) {
+				return manager.RunEvaluator(context.Background(), job)
+			},
+			want: "global-provider:evaluator:evaluator-override-model",
+		},
+		{
+			name: "executor override provider keeps role profile model",
+			job: domain.Job{
+				Provider: domain.ProviderName("global-provider"),
+				RoleProfiles: domain.RoleProfiles{
+					Executor: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "executor-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"executor": {Provider: domain.ProviderName("executor-override-provider")},
+				},
+			},
+			run: func(job domain.Job) (string, error) {
+				return manager.RunWorker(context.Background(), job, domain.LeaderOutput{TaskType: "implement"})
+			},
+			want: "executor-override-provider:executor:executor-profile-model",
+		},
+		{
+			name: "reviewer override model keeps role profile provider",
+			job: domain.Job{
+				Provider: domain.ProviderName("global-provider"),
+				RoleProfiles: domain.RoleProfiles{
+					Reviewer: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "reviewer-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"reviewer": {Model: "reviewer-override-model"},
+				},
+			},
+			run: func(job domain.Job) (string, error) {
+				return manager.RunWorker(context.Background(), job, domain.LeaderOutput{TaskType: "review"})
+			},
+			want: "role-profile-provider:reviewer:reviewer-override-model",
+		},
+		{
+			name: "tester override provider keeps role profile model",
+			job: domain.Job{
+				Provider: domain.ProviderName("global-provider"),
+				RoleProfiles: domain.RoleProfiles{
+					Tester: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "tester-profile-model"},
+				},
+				RoleOverrides: map[string]domain.RoleProfile{
+					"tester": {Provider: domain.ProviderName("tester-override-provider")},
+				},
+			},
+			run: func(job domain.Job) (string, error) {
+				return manager.RunWorker(context.Background(), job, domain.LeaderOutput{TaskType: "test"})
+			},
+			want: "tester-override-provider:tester:tester-profile-model",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tc.run(tc.job)
+			if err != nil {
+				t.Fatalf("expected role override fallback to succeed, got error: %v", err)
 			}
 			if got != tc.want {
 				t.Fatalf("expected %q, got %q", tc.want, got)
@@ -539,6 +735,120 @@ func TestCodexAdapterAddsModelFlagForGPTRoleProfiles(t *testing.T) {
 				t.Fatalf("expected %s output", tc.name)
 			}
 			assertCodexModelFlag(t, capturedArgs, "gpt-5.4")
+		})
+	}
+}
+
+func TestClaudeAdapterBuildsCLIArgsAndModelFlagForRoleProfiles(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		job        func() domain.Job
+		invoke     func(*ClaudeAdapter, domain.Job) (string, error)
+		wantModel  string
+		wantPrompt string
+	}{
+		{
+			name: "leader",
+			job: func() domain.Job {
+				return domain.Job{
+					Goal:     "Leader uses claude model",
+					Provider: domain.ProviderClaude,
+					RoleProfiles: domain.RoleProfiles{
+						Leader: domain.ExecutionProfile{Provider: domain.ProviderClaude, Model: "sonnet"},
+					},
+				}
+			},
+			invoke: func(adapter *ClaudeAdapter, job domain.Job) (string, error) {
+				return adapter.RunLeader(context.Background(), job)
+			},
+			wantModel:  "sonnet",
+			wantPrompt: "leader component",
+		},
+		{
+			name: "planner",
+			job: func() domain.Job {
+				return domain.Job{
+					Goal:     "Planner uses claude model",
+					Provider: domain.ProviderClaude,
+					RoleProfiles: domain.RoleProfiles{
+						Planner: domain.ExecutionProfile{Provider: domain.ProviderClaude, Model: "haiku"},
+					},
+				}
+			},
+			invoke: func(adapter *ClaudeAdapter, job domain.Job) (string, error) {
+				return adapter.RunPlanner(context.Background(), job)
+			},
+			wantModel:  "haiku",
+			wantPrompt: "planner component",
+		},
+		{
+			name: "evaluator",
+			job: func() domain.Job {
+				return domain.Job{
+					Goal:     "Evaluator uses claude model",
+					Provider: domain.ProviderClaude,
+					RoleProfiles: domain.RoleProfiles{
+						Evaluator: domain.ExecutionProfile{Provider: domain.ProviderClaude, Model: "sonnet"},
+					},
+				}
+			},
+			invoke: func(adapter *ClaudeAdapter, job domain.Job) (string, error) {
+				return adapter.RunEvaluator(context.Background(), job)
+			},
+			wantModel:  "sonnet",
+			wantPrompt: "evaluator component",
+		},
+		{
+			name: "worker",
+			job: func() domain.Job {
+				return domain.Job{
+					Goal:     "Worker uses claude model",
+					Provider: domain.ProviderClaude,
+					RoleProfiles: domain.RoleProfiles{
+						Executor: domain.ExecutionProfile{Provider: domain.ProviderClaude, Model: "haiku"},
+					},
+				}
+			},
+			invoke: func(adapter *ClaudeAdapter, job domain.Job) (string, error) {
+				return adapter.RunWorker(context.Background(), job, domain.LeaderOutput{
+					Action:   "run_worker",
+					Target:   "B",
+					TaskType: "implement",
+					TaskText: "execute work",
+				})
+			},
+			wantModel:  "haiku",
+			wantPrompt: "executor worker",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var capturedArgs []string
+			var capturedPrompt string
+			adapter := newTestClaudeAdapter(t, func(stdinData string, args []string) {
+				capturedPrompt = stdinData
+				capturedArgs = append([]string(nil), args...)
+			})
+
+			out, err := tc.invoke(adapter, tc.job())
+			if err != nil {
+				t.Fatalf("expected %s run to succeed, got error: %v", tc.name, err)
+			}
+			if out == "" {
+				t.Fatalf("expected %s output", tc.name)
+			}
+			if !strings.Contains(capturedPrompt, tc.wantPrompt) {
+				t.Fatalf("expected %s prompt to contain %q, got %q", tc.name, tc.wantPrompt, capturedPrompt)
+			}
+			assertClaudeBaseArgs(t, capturedArgs)
+			assertClaudeModelFlag(t, capturedArgs, tc.wantModel)
+			assertClaudeJSONSchemaMinified(t, capturedArgs)
 		})
 	}
 }
@@ -938,6 +1248,35 @@ func (a roleTrackingAdapter) RunEvaluator(_ context.Context, _ domain.Job) (stri
 	return fmt.Sprintf("%s:evaluator", a.name), nil
 }
 
+type profileEchoAdapter struct {
+	name domain.ProviderName
+}
+
+func (a profileEchoAdapter) Name() domain.ProviderName {
+	return a.name
+}
+
+func (a profileEchoAdapter) RunLeader(_ context.Context, job domain.Job) (string, error) {
+	profile := job.RoleProfiles.ProfileFor(domain.RoleLeader, job.Provider)
+	return fmt.Sprintf("%s:leader:%s", a.name, profile.Model), nil
+}
+
+func (a profileEchoAdapter) RunWorker(_ context.Context, job domain.Job, task domain.LeaderOutput) (string, error) {
+	role := domain.RoleForTaskType(task.TaskType)
+	profile := job.RoleProfiles.ProfileFor(role, job.Provider)
+	return fmt.Sprintf("%s:%s:%s", a.name, role, profile.Model), nil
+}
+
+func (a profileEchoAdapter) RunPlanner(_ context.Context, job domain.Job) (string, error) {
+	profile := job.RoleProfiles.ProfileFor(domain.RolePlanner, job.Provider)
+	return fmt.Sprintf("%s:planner:%s", a.name, profile.Model), nil
+}
+
+func (a profileEchoAdapter) RunEvaluator(_ context.Context, job domain.Job) (string, error) {
+	profile := job.RoleProfiles.ProfileFor(domain.RoleEvaluator, job.Provider)
+	return fmt.Sprintf("%s:evaluator:%s", a.name, profile.Model), nil
+}
+
 func newTestCodexAdapter(t *testing.T, capture func(string, []string)) *CodexAdapter {
 	t.Helper()
 
@@ -972,6 +1311,24 @@ func newTestCodexAdapter(t *testing.T, capture func(string, []string)) *CodexAda
 	}
 }
 
+func newTestClaudeAdapter(t *testing.T, capture func(string, []string)) *ClaudeAdapter {
+	t.Helper()
+
+	return &ClaudeAdapter{
+		executable: "go",
+		probeArgs:  []string{"version"},
+		probeTime:  2 * time.Second,
+		runTime:    2 * time.Second,
+		runCommand: func(_ context.Context, _ string, _ time.Duration, _ string, _ []string, stdinData string, args ...string) (CommandResult, error) {
+			t.Helper()
+			if capture != nil {
+				capture(stdinData, args)
+			}
+			return CommandResult{Stdout: `{"structured_output":{"status":"success","summary":"ok"}}`}, nil
+		},
+	}
+}
+
 func assertCodexModelFlag(t *testing.T, args []string, want string) {
 	t.Helper()
 
@@ -994,6 +1351,54 @@ func assertCodexModelFlagAbsent(t *testing.T, args []string) {
 			t.Fatalf("expected --model to be absent from args %v", args)
 		}
 	}
+}
+
+func assertClaudeBaseArgs(t *testing.T, args []string) {
+	t.Helper()
+
+	want := []string{"-p", "--permission-mode", "dontAsk", "--output-format", "json", "--json-schema", "--no-session-persistence"}
+	for _, token := range want {
+		if !containsArg(args, token) {
+			t.Fatalf("expected Claude args to include %q, got %v", token, args)
+		}
+	}
+}
+
+func assertClaudeModelFlag(t *testing.T, args []string, want string) {
+	t.Helper()
+
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--model" {
+			if args[i+1] != want {
+				t.Fatalf("expected --model %q, got %q in args %v", want, args[i+1], args)
+			}
+			return
+		}
+	}
+	t.Fatalf("expected --model %q in args %v", want, args)
+}
+
+func assertClaudeJSONSchemaMinified(t *testing.T, args []string) {
+	t.Helper()
+
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--json-schema" {
+			if strings.Contains(args[i+1], "\n") {
+				t.Fatalf("expected minified --json-schema argument, got %q", args[i+1])
+			}
+			return
+		}
+	}
+	t.Fatalf("expected --json-schema in args %v", args)
+}
+
+func containsArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
 }
 
 func modelOrEmpty(model string) string {

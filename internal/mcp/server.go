@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -32,6 +33,7 @@ type Server struct {
 var (
 	statusWaitPollInterval = 2 * time.Second
 	statusWaitTimeout      = 5 * time.Minute
+	statusWaitDefault      = 30 * time.Second
 )
 
 func NewServer(service *orchestrator.Service) *Server {
@@ -251,24 +253,26 @@ func toolList() []toolDef {
 		},
 		{
 			Name:        "gorchera_status",
-			Description: "Get the current status of a job. Set wait=true to block until a terminal state or the wait timeout.",
+			Description: "Get job status. wait=true blocks until terminal state (default 30s, wait_timeout=0 for 5min). For long-running jobs, prefer periodic polling over blocking to stay responsive.",
 			InputSchema: toolInputSchema{
 				Type: "object",
 				Properties: map[string]schemaProp{
-					"job_id": {Type: "string", Description: "Job ID"},
-					"wait":   {Type: "boolean", Description: "When true, wait for the job to reach a terminal state before returning", Default: false},
+					"job_id":       {Type: "string", Description: "Job ID"},
+					"wait":         {Type: "boolean", Description: "When true, wait for the job to reach a terminal state before returning", Default: false},
+					"wait_timeout": {Type: "integer", Description: "Optional wait timeout in seconds when wait=true. Omit to use 30 seconds. Set to 0 to preserve the original 5-minute timeout.", Default: 30},
 				},
 				Required: []string{"job_id"},
 			},
 		},
 		{
 			Name:        "gorchera_chain_status",
-			Description: "Get the current status of a sequential job chain. Set wait=true to block until a terminal state or the wait timeout.",
+			Description: "Get chain status. wait=true blocks until terminal state (default 30s, wait_timeout=0 for 5min). For long-running chains, prefer periodic polling over blocking to stay responsive.",
 			InputSchema: toolInputSchema{
 				Type: "object",
 				Properties: map[string]schemaProp{
-					"chain_id": {Type: "string", Description: "Chain ID"},
-					"wait":     {Type: "boolean", Description: "When true, wait for the chain to reach a terminal state before returning", Default: false},
+					"chain_id":     {Type: "string", Description: "Chain ID"},
+					"wait":         {Type: "boolean", Description: "When true, wait for the chain to reach a terminal state before returning", Default: false},
+					"wait_timeout": {Type: "integer", Description: "Optional wait timeout in seconds when wait=true. Omit to use 30 seconds. Set to 0 to preserve the original 5-minute timeout.", Default: 30},
 				},
 				Required: []string{"chain_id"},
 			},
@@ -576,7 +580,7 @@ func (s *Server) toolStatus(ctx context.Context, args map[string]any) (toolResul
 		return toolResult{}, err
 	}
 	wait := boolArgDefault(args, "wait", false)
-	job, err := s.getJobStatus(ctx, jobID, wait)
+	job, err := s.getJobStatus(ctx, jobID, wait, statusWaitDuration(args, wait))
 	if err != nil {
 		return toolResult{}, err
 	}
@@ -589,14 +593,14 @@ func (s *Server) toolChainStatus(ctx context.Context, args map[string]any) (tool
 		return toolResult{}, err
 	}
 	wait := boolArgDefault(args, "wait", false)
-	chain, err := s.getChainStatus(ctx, chainID, wait)
+	chain, err := s.getChainStatus(ctx, chainID, wait, statusWaitDuration(args, wait))
 	if err != nil {
 		return toolResult{}, err
 	}
 	return jsonResult(chain)
 }
 
-func (s *Server) getJobStatus(ctx context.Context, jobID string, wait bool) (*domain.Job, error) {
+func (s *Server) getJobStatus(ctx context.Context, jobID string, wait bool, waitTimeout time.Duration) (*domain.Job, error) {
 	if !wait {
 		return s.service.Get(ctx, jobID)
 	}
@@ -605,7 +609,7 @@ func (s *Server) getJobStatus(ctx context.Context, jobID string, wait bool) (*do
 		job     *domain.Job
 		lastErr error
 	)
-	timer := time.NewTimer(statusWaitTimeout)
+	timer := time.NewTimer(waitTimeout)
 	ticker := time.NewTicker(statusWaitPollInterval)
 	defer timer.Stop()
 	defer ticker.Stop()
@@ -635,7 +639,7 @@ func (s *Server) getJobStatus(ctx context.Context, jobID string, wait bool) (*do
 	}
 }
 
-func (s *Server) getChainStatus(ctx context.Context, chainID string, wait bool) (*domain.JobChain, error) {
+func (s *Server) getChainStatus(ctx context.Context, chainID string, wait bool, waitTimeout time.Duration) (*domain.JobChain, error) {
 	if !wait {
 		return s.service.GetChain(ctx, chainID)
 	}
@@ -644,7 +648,7 @@ func (s *Server) getChainStatus(ctx context.Context, chainID string, wait bool) 
 		chain   *domain.JobChain
 		lastErr error
 	)
-	timer := time.NewTimer(statusWaitTimeout)
+	timer := time.NewTimer(waitTimeout)
 	ticker := time.NewTicker(statusWaitPollInterval)
 	defer timer.Stop()
 	defer ticker.Stop()
@@ -790,7 +794,9 @@ func (s *Server) toolApprove(ctx context.Context, args map[string]any) (toolResu
 		return toolResult{}, err
 	}
 	go func() {
-		s.service.Approve(context.Background(), jobID) //nolint:errcheck
+		if _, err := s.service.Approve(context.Background(), jobID); err != nil {
+			log.Printf("[gorchera] Approve failed for job %s: %v", jobID, err)
+		}
 	}()
 	snapshot := map[string]any{
 		"job_id":  job.ID,
@@ -824,7 +830,9 @@ func (s *Server) toolRetry(ctx context.Context, args map[string]any) (toolResult
 		return toolResult{}, err
 	}
 	go func() {
-		s.service.Retry(context.Background(), jobID) //nolint:errcheck
+		if _, err := s.service.Retry(context.Background(), jobID); err != nil {
+			log.Printf("[gorchera] Retry failed for job %s: %v", jobID, err)
+		}
 	}()
 	snapshot := map[string]any{
 		"job_id":  job.ID,
@@ -858,7 +866,9 @@ func (s *Server) toolResume(ctx context.Context, args map[string]any) (toolResul
 		return toolResult{}, err
 	}
 	go func() {
-		s.service.Resume(context.Background(), jobID) //nolint:errcheck
+		if _, err := s.service.Resume(context.Background(), jobID); err != nil {
+			log.Printf("[gorchera] Resume failed for job %s: %v", jobID, err)
+		}
 	}()
 	snapshot := map[string]any{
 		"job_id":  job.ID,
@@ -930,6 +940,41 @@ func intArgDefault(args map[string]any, key string, def int) int {
 		return v
 	}
 	return def
+}
+
+func intArg(args map[string]any, key string) (int, bool) {
+	switch v := args[key].(type) {
+	case float64:
+		return int(v), true
+	case int:
+		return v, true
+	}
+	return 0, false
+}
+
+func statusWaitDuration(args map[string]any, wait bool) time.Duration {
+	if !wait {
+		return 0
+	}
+
+	seconds, ok := intArg(args, "wait_timeout")
+	if !ok {
+		return defaultStatusWaitTimeout()
+	}
+	if seconds == 0 {
+		return statusWaitTimeout
+	}
+	if seconds > 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	return statusWaitDefault
+}
+
+func defaultStatusWaitTimeout() time.Duration {
+	if statusWaitTimeout < statusWaitDefault {
+		return statusWaitTimeout
+	}
+	return statusWaitDefault
 }
 
 func boolArgDefault(args map[string]any, key string, def bool) bool {

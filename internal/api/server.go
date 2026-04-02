@@ -1,12 +1,12 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -29,7 +29,27 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/jobs/", s.handleJob)
 	mux.HandleFunc("/harness", s.handleHarness)
 	mux.HandleFunc("/harness/", s.handleHarness)
-	return mux
+	// Wrap all routes with bearer token auth when GORCHERA_AUTH_TOKEN is set.
+	// If the env var is empty/unset, auth is skipped (development mode).
+	token := os.Getenv("GORCHERA_AUTH_TOKEN")
+	return authMiddleware(token, mux)
+}
+
+// authMiddleware enforces Bearer token authentication when token is non-empty.
+// If token is empty, requests pass through without any check (development mode).
+func authMiddleware(token string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if token == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer "+token {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -99,7 +119,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		job, err := s.orchestrator.Resume(context.Background(), jobID)
+		job, err := s.orchestrator.Resume(r.Context(), jobID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -114,7 +134,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		job, err := s.orchestrator.Approve(context.Background(), jobID)
+		job, err := s.orchestrator.Approve(r.Context(), jobID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -126,7 +146,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		job, err := s.orchestrator.Retry(context.Background(), jobID)
+		job, err := s.orchestrator.Retry(r.Context(), jobID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -152,7 +172,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		job, err := s.orchestrator.Reject(context.Background(), jobID, req.Reason)
+		job, err := s.orchestrator.Reject(r.Context(), jobID, req.Reason)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -178,7 +198,7 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		job, err := s.orchestrator.Cancel(context.Background(), jobID, req.Reason)
+		job, err := s.orchestrator.Cancel(r.Context(), jobID, req.Reason)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

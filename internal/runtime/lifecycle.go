@@ -75,7 +75,7 @@ func (m *ProcessManager) Start(ctx context.Context, req StartRequest) (ProcessHa
 	}
 	cmd := factory(ctx, req.Command, req.Args...)
 	cmd.Dir = req.Dir
-	cmd.Env = append(os.Environ(), m.Environment...)
+	cmd.Env = append(minimalEnv(), m.Environment...)
 	cmd.Env = append(cmd.Env, req.Env...)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
@@ -238,9 +238,14 @@ func (m *ProcessManager) record(pid int) (*processRecord, error) {
 func (m *ProcessManager) watchProcess(pid int, cmd *exec.Cmd, rec *processRecord) {
 	waitErr := cmd.Wait()
 	finishedAt := time.Now().UTC()
-	state := ProcessStateExited
 	exitCode := exitCodeFromError(waitErr)
-	if rec.stopRequested {
+	// Read stopRequested under the mutex to avoid a data race with Stop(),
+	// which sets this field while holding m.mu.
+	m.mu.Lock()
+	stopRequested := rec.stopRequested
+	m.mu.Unlock()
+	state := ProcessStateExited
+	if stopRequested {
 		state = ProcessStateStopped
 	} else if waitErr != nil || exitCode != 0 {
 		state = ProcessStateFailed

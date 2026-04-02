@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -98,6 +99,7 @@ func BuildPlanningView(job *domain.Job) PlanningView {
 	}
 
 	seen := make(map[string]struct{})
+	planningRoot := jobArtifactsRoot(job)
 	for _, path := range append(append([]string(nil), job.PlanningArtifacts...), job.SprintContractRef) {
 		path = strings.TrimSpace(path)
 		if path == "" {
@@ -107,7 +109,7 @@ func BuildPlanningView(job *domain.Job) PlanningView {
 			continue
 		}
 		seen[path] = struct{}{}
-		view.Artifacts = append(view.Artifacts, loadArtifactView(path))
+		view.Artifacts = append(view.Artifacts, loadArtifactView(planningRoot, path))
 	}
 	return view
 }
@@ -123,7 +125,7 @@ func BuildEvaluatorView(job *domain.Job) EvaluatorView {
 		return view
 	}
 
-	data, err := os.ReadFile(job.EvaluatorReportRef)
+	data, err := safeReadFile(jobArtifactsRoot(job), job.EvaluatorReportRef)
 	if err != nil {
 		view.Error = err.Error()
 		return view
@@ -150,7 +152,8 @@ func BuildVerificationView(job *domain.Job) VerificationView {
 		Note:                    "verification is a read-only contract derived from the sprint contract, evaluator report, and role profiles",
 	}
 
-	if sprint := loadSprintContract(job.SprintContractRef); sprint != nil {
+	root := jobArtifactsRoot(job)
+	if sprint := loadSprintContract(root, job.SprintContractRef); sprint != nil {
 		view.SprintContract = sprint
 		view.DerivedChecks = append(view.DerivedChecks, sprint.RequiredStepTypes...)
 		view.DerivedChecks = append(view.DerivedChecks, sprint.AcceptanceCriteria...)
@@ -159,7 +162,7 @@ func BuildVerificationView(job *domain.Job) VerificationView {
 		}
 	}
 
-	if report := loadEvaluatorReport(job.EvaluatorReportRef); report != nil {
+	if report := loadEvaluatorReport(root, job.EvaluatorReportRef); report != nil {
 		view.EvaluatorReport = report
 		view.DerivedChecks = append(view.DerivedChecks, report.Evidence...)
 		if len(report.MissingStepTypes) > 0 {
@@ -189,11 +192,11 @@ func BuildProfileView(job *domain.Job) ProfileView {
 	}
 }
 
-func loadSprintContract(path string) *domain.SprintContract {
+func loadSprintContract(root, path string) *domain.SprintContract {
 	if strings.TrimSpace(path) == "" {
 		return nil
 	}
-	data, err := os.ReadFile(path)
+	data, err := safeReadFile(root, path)
 	if err != nil {
 		return nil
 	}
@@ -204,11 +207,11 @@ func loadSprintContract(path string) *domain.SprintContract {
 	return &contract
 }
 
-func loadEvaluatorReport(path string) *domain.EvaluatorReport {
+func loadEvaluatorReport(root, path string) *domain.EvaluatorReport {
 	if strings.TrimSpace(path) == "" {
 		return nil
 	}
-	data, err := os.ReadFile(path)
+	data, err := safeReadFile(root, path)
 	if err != nil {
 		return nil
 	}
@@ -271,14 +274,43 @@ func dedupeStrings(values []string) []string {
 	return out
 }
 
-func loadArtifactView(path string) ArtifactView {
+// safeReadFile reads path only if it is within allowedRoot, preventing path traversal.
+// Both allowedRoot and path are resolved to absolute paths before comparison.
+func safeReadFile(allowedRoot, path string) ([]byte, error) {
+	absRoot, err := filepath.Abs(allowedRoot)
+	if err != nil {
+		return nil, fmt.Errorf("resolving root %q: %w", allowedRoot, err)
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolving path %q: %w", path, err)
+	}
+	cleanRoot := filepath.Clean(absRoot)
+	cleanPath := filepath.Clean(absPath)
+	// Accept the root itself or any path strictly under root (with separator boundary).
+	if cleanPath != cleanRoot && !strings.HasPrefix(cleanPath, cleanRoot+string(filepath.Separator)) {
+		return nil, fmt.Errorf("path %q is outside allowed root %q", path, allowedRoot)
+	}
+	return os.ReadFile(cleanPath)
+}
+
+// jobArtifactsRoot returns the allowed root directory for artifact reads for a given job.
+// Falls back to the current directory when WorkspaceDir is unset.
+func jobArtifactsRoot(job *domain.Job) string {
+	if job.WorkspaceDir != "" {
+		return job.WorkspaceDir
+	}
+	return "."
+}
+
+func loadArtifactView(root, path string) ArtifactView {
 	view := ArtifactView{
 		Name: filepath.Base(path),
 		Path: path,
 		Kind: artifactKind(path),
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := safeReadFile(root, path)
 	if err != nil {
 		view.Error = err.Error()
 		return view

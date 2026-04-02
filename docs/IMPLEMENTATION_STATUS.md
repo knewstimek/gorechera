@@ -31,6 +31,7 @@ go test ./...    # PASS
   - `--json-schema`
   - stdin prompt delivery
   - role-specific model selection
+  - tolerant JSON envelope extraction for `structured_output`, `parsed_output`, and object-valued `result`
 - Real Codex CLI adapter:
   - `codex exec`
   - `--output-schema`
@@ -39,9 +40,11 @@ go test ./...    # PASS
   - role-specific GPT-family model selection
 - Mock adapter remains available for end-to-end tests.
 - Role-based provider resolution is implemented:
-  - role profile provider first
-  - job provider second
+  - `job.RoleOverrides[role]` first
+  - `job.RoleProfiles[role]` second
+  - job provider third
   - `mock` fallback last
+- MCP `gorchera_start_job` now accepts a structured `role_overrides` object with per-role `provider` / `model` overrides and persists it onto the started job.
 - `fallback_provider` is honored if the primary provider lookup fails.
 
 ### Structured provider errors and retry behavior
@@ -115,8 +118,49 @@ go test ./...    # PASS
 - MCP server is implemented with:
   - job lifecycle tools
   - chain lifecycle tools
+  - `gorchera_start_job.role_overrides`
   - `wait=true` polling for job and chain status
   - `gorchera_steer`
+
+## Security Audit Fixes (2026-04-02)
+
+All 10 HIGH severity findings from `docs/AUDIT_REPORT.md` have been fixed. `go build ./...` and `go test ./...` pass with no regressions.
+
+### Path traversal input validation (HIGH-01, HIGH-02, HIGH-03)
+
+- **HIGH-01 (`internal/store/state_store.go`):** Added `validIDRegexp` (`^[a-zA-Z0-9_-.]+$`) and `validateID()`. Applied at entry of `SaveJob`, `LoadJob`, `SaveChain`, `LoadChain`. IDs like `../../etc/passwd` are now rejected with an error.
+- **HIGH-02 (`internal/store/artifact_store.go`):** Applied `validateID(jobID)` at entry of all four `Materialize*` methods, reusing the shared helper.
+- **HIGH-03 (`internal/api/views.go`):** Added `safeReadFile(root, path)` that resolves both paths via `filepath.Abs` and enforces `strings.HasPrefix` containment. All `os.ReadFile` call sites in `loadArtifactView`, `loadSprintContract`, `loadEvaluatorReport` now go through `safeReadFile`.
+- Tests: `state_store_test.go` (ID validation), `views_test.go` (path containment).
+
+### Data race fix (HIGH-04)
+
+- **HIGH-04 (`internal/runtime/lifecycle.go`):** Moved `rec.stopRequested` read inside a dedicated `m.mu.Lock/Unlock` block immediately after `cmd.Wait()` in `watchProcess()`, eliminating the race with `Stop()`.
+- Test: race-detector test in `lifecycle_test.go`.
+
+### Environment variable leakage fix (HIGH-05, HIGH-06)
+
+- **HIGH-05 (`internal/runtime/runner.go`):** Replaced `os.Environ()` with `minimalEnv()` in `Runner.Run()`. `minimalEnv()` allowlists PATH, SYSTEMROOT, HOME, TEMP, TMP, Windows profile dirs (LOCALAPPDATA, APPDATA, USERPROFILE), shell helpers (COMSPEC, PATHEXT), and Go toolchain vars (GOCACHE, GOPATH, GOROOT, GOPROXY). Secrets such as `ANTHROPIC_API_KEY` are excluded.
+- **HIGH-06 (`internal/runtime/lifecycle.go`):** Applied same `minimalEnv()` in `ProcessManager.Start()`.
+- Tests: `runner_test.go`, `lifecycle_test.go` verify `ANTHROPIC_API_KEY` is absent from subprocess env.
+
+### HTTP server security (HIGH-07, HIGH-08)
+
+- **HIGH-07 (`cmd/gorchera/main.go`, `internal/api/server.go`):** Default listen address changed from `:8080` to `127.0.0.1:8080`. Added `authMiddleware()` that reads `GORCHERA_AUTH_TOKEN` env var; if set, enforces `Authorization: Bearer <token>` header (returns 401 on mismatch); passes through when unset (dev mode). `Handler()` wraps the mux with `authMiddleware`.
+- **HIGH-08 (`internal/api/server.go`):** All 5 `context.Background()` calls in handler functions (Resume, Approve, Retry, Reject, Cancel) replaced with `r.Context()`.
+- Tests: `server_test.go` -- auth middleware accepts/rejects, r.Context() regression guard.
+
+### Service shutdown context (HIGH-09)
+
+- **HIGH-09 (`internal/orchestrator/service.go`):** Added `shutdownCtx`/`shutdownCancel` fields to `Service` struct. `NewService` creates the context via `context.WithCancel(context.Background())`. Added `Shutdown()` method that calls `shutdownCancel()`. `startPreparedJobAsync` now uses `s.shutdownCtx` instead of `context.Background()`. No existing callers broken.
+- Test: `service_test.go` -- `TestServiceShutdownCancelsContext`.
+
+### MCP error logging (HIGH-10)
+
+- **HIGH-10 (`internal/mcp/server.go`):** Fire-and-forget goroutines in `toolApprove`, `toolRetry`, `toolResume` now capture the returned error and log it via `log.Printf("[gorchera] %s failed for job %s: %v", ...)`. `//nolint:errcheck` comments removed.
+- Test: `mcp/server_test.go` -- `TestToolApproveLogsErrorOnFailure`.
+
+---
 
 ## Partially Implemented Or Intentionally Limited
 

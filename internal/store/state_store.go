@@ -6,11 +6,29 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
 	"gorchera/internal/domain"
 )
+
+// validIDRegexp allows only safe characters in IDs used as file-system path components.
+// Prevents path traversal via IDs containing "..", "/", "\", etc.
+var validIDRegexp = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
+
+// validateID returns an error if id contains characters that could allow path traversal.
+// Explicitly rejects "." and ".." which are special filesystem path components even though
+// their characters individually satisfy the allowlist regexp.
+func validateID(id string) error {
+	if id == "." || id == ".." {
+		return fmt.Errorf("invalid ID %q: reserved filesystem path component", id)
+	}
+	if !validIDRegexp.MatchString(id) {
+		return fmt.Errorf("invalid ID %q: must match ^[a-zA-Z0-9_-.]+$", id)
+	}
+	return nil
+}
 
 type StateStore struct {
 	root string
@@ -21,6 +39,9 @@ func NewStateStore(root string) *StateStore {
 }
 
 func (s *StateStore) SaveJob(_ context.Context, job *domain.Job) error {
+	if err := validateID(job.ID); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(s.jobsDir(), 0o755); err != nil {
 		return err
 	}
@@ -33,6 +54,9 @@ func (s *StateStore) SaveJob(_ context.Context, job *domain.Job) error {
 }
 
 func (s *StateStore) SaveChain(_ context.Context, chain *domain.JobChain) error {
+	if err := validateID(chain.ID); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(s.chainsDir(), 0o755); err != nil {
 		return err
 	}
@@ -45,6 +69,9 @@ func (s *StateStore) SaveChain(_ context.Context, chain *domain.JobChain) error 
 }
 
 func (s *StateStore) LoadJob(_ context.Context, jobID string) (*domain.Job, error) {
+	if err := validateID(jobID); err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(s.jobPath(jobID))
 	if err != nil {
 		return nil, err
@@ -57,6 +84,9 @@ func (s *StateStore) LoadJob(_ context.Context, jobID string) (*domain.Job, erro
 }
 
 func (s *StateStore) LoadChain(_ context.Context, chainID string) (*domain.JobChain, error) {
+	if err := validateID(chainID); err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(s.chainPath(chainID))
 	if err != nil {
 		return nil, err

@@ -20,6 +20,9 @@ func NewArtifactStore(root string) *ArtifactStore {
 }
 
 func (s *ArtifactStore) MaterializeWorkerArtifacts(jobID string, stepIndex int, output domain.WorkerOutput) ([]string, error) {
+	if err := validateID(jobID); err != nil {
+		return nil, err
+	}
 	baseDir := filepath.Join(s.root, jobID)
 	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return nil, err
@@ -52,6 +55,9 @@ func (s *ArtifactStore) MaterializeWorkerArtifacts(jobID string, stepIndex int, 
 }
 
 func (s *ArtifactStore) MaterializeTextArtifact(jobID, name, content string) (string, error) {
+	if err := validateID(jobID); err != nil {
+		return "", err
+	}
 	baseDir := filepath.Join(s.root, jobID)
 	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return "", err
@@ -64,6 +70,9 @@ func (s *ArtifactStore) MaterializeTextArtifact(jobID, name, content string) (st
 }
 
 func (s *ArtifactStore) MaterializeJSONArtifact(jobID, name string, value any) (string, error) {
+	if err := validateID(jobID); err != nil {
+		return "", err
+	}
 	baseDir := filepath.Join(s.root, jobID)
 	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return "", err
@@ -80,6 +89,9 @@ func (s *ArtifactStore) MaterializeJSONArtifact(jobID, name string, value any) (
 }
 
 func (s *ArtifactStore) MaterializeSystemResult(jobID string, stepIndex int, result runtimeexec.Result) ([]string, error) {
+	if err := validateID(jobID); err != nil {
+		return nil, err
+	}
 	baseDir := filepath.Join(s.root, jobID)
 	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return nil, err

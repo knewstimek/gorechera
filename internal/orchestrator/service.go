@@ -47,6 +47,7 @@ type CreateJobInput struct {
 	DoneCriteria    []string
 	Provider        domain.ProviderName
 	RoleProfiles    domain.RoleProfiles
+	RoleOverrides   map[string]domain.RoleProfile
 	MaxSteps        int
 	StrictnessLevel string // strict | normal | lenient; empty defaults to "normal"
 	ContextMode     string // full | summary | minimal; empty defaults to "full"
@@ -76,9 +77,15 @@ type Service struct {
 	// TOCTOU 윈도우를 닫기 위해 "체크 통과 후 IO 완료 전" 구간을 마킹한다.
 	// ownsHarness 측이 inflight PID의 소유자 변경을 블록하도록 체크한다.
 	harnessInflight map[int]string // pid -> jobID (현재 IO 점유 중인 job)
+
+	// shutdownCtx is cancelled by Shutdown() to signal all background job
+	// goroutines (started by startPreparedJobAsync) to stop.
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
 }
 
 func NewService(sessions *provider.SessionManager, state *store.StateStore, artifacts *store.ArtifactStore, workspaceRoot string) *Service {
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	return &Service{
 		sessions:      sessions,
 		state:         state,
@@ -94,7 +101,15 @@ func NewService(sessions *provider.SessionManager, state *store.StateStore, arti
 		harnessOwners:   make(map[int]string),
 		jobHarnesses:    make(map[string]map[int]struct{}),
 		harnessInflight: make(map[int]string),
+		shutdownCtx:     shutdownCtx,
+		shutdownCancel:  shutdownCancel,
 	}
+}
+
+// Shutdown cancels the service-level context, signalling all background job
+// goroutines to stop. It is safe to call multiple times.
+func (s *Service) Shutdown() {
+	s.shutdownCancel()
 }
 
 // EventChan returns a read-only channel that receives a notification each time
@@ -166,7 +181,7 @@ func (s *Service) StartChain(ctx context.Context, goals []domain.ChainGoal, work
 	if err := s.state.SaveChain(ctx, chain); err != nil {
 		return nil, err
 	}
-	if err := s.startChainGoal(ctx, chain, workspaceDir, 0); err != nil {
+	if err := s.startChainGoal(ctx, chain, workspaceDir, 0, nil); err != nil {
 		return nil, err
 	}
 	return chain, nil
@@ -192,6 +207,7 @@ func (s *Service) prepareJob(input CreateJobInput) (*domain.Job, error) {
 		StrictnessLevel:      normalizeStrictnessLevel(input.StrictnessLevel),
 		ContextMode:          normalizeContextMode(input.ContextMode),
 		RoleProfiles:         roleProfiles,
+		RoleOverrides:        input.RoleOverrides,
 		ChainID:              strings.TrimSpace(input.ChainID),
 		ChainGoalIndex:       input.ChainGoalIndex,
 		Status:               domain.JobStatusStarting,
@@ -221,12 +237,12 @@ func (s *Service) startPreparedJobAsync(ctx context.Context, job *domain.Job) er
 		return err
 	}
 	go func() {
-		s.runLoop(context.Background(), job) //nolint:errcheck
+		s.runLoop(s.shutdownCtx, job) //nolint:errcheck
 	}()
 	return nil
 }
 
-func (s *Service) startChainGoal(ctx context.Context, chain *domain.JobChain, workspaceDir string, index int) error {
+func (s *Service) startChainGoal(ctx context.Context, chain *domain.JobChain, workspaceDir string, index int, chainCtx *domain.ChainContext) error {
 	if index < 0 || index >= len(chain.Goals) {
 		return fmt.Errorf("chain goal index out of range: %d", index)
 	}
@@ -250,6 +266,8 @@ func (s *Service) startChainGoal(ctx context.Context, chain *domain.JobChain, wo
 		return err
 	}
 
+	// Attach previous chain step results so the planner can build on prior work.
+	job.ChainContext = chainCtx
 	goal.JobID = job.ID
 	goal.Status = domain.ChainGoalStatusRunning
 	chain.CurrentIndex = index
@@ -505,7 +523,7 @@ func (s *Service) SkipChainGoal(ctx context.Context, chainID string) (*domain.Jo
 	if err := s.state.SaveChain(ctx, chain); err != nil {
 		return nil, err
 	}
-	if err := s.startChainGoal(ctx, chain, workdir, chain.CurrentIndex+1); err != nil {
+	if err := s.startChainGoal(ctx, chain, workdir, chain.CurrentIndex+1, nil); err != nil {
 		return nil, err
 	}
 	return s.state.LoadChain(ctx, chain.ID)
@@ -692,7 +710,16 @@ func (s *Service) advanceChain(ctx context.Context, chain *domain.JobChain) erro
 		if latest.Status == domain.ChainStatusPaused || latest.Status == domain.ChainStatusCancelled || latest.Status == domain.ChainStatusFailed || latest.Status == domain.ChainStatusDone {
 			return nil
 		}
-		return s.startChainGoal(ctx, latest, job.WorkspaceDir, latest.CurrentIndex+1)
+		// Pass the completed job's summary and evaluator report ref so the next
+		// goal's planner can build on what the previous chain step accomplished.
+		var prevCtx *domain.ChainContext
+		if job.Summary != "" || job.EvaluatorReportRef != "" {
+			prevCtx = &domain.ChainContext{
+				Summary:            job.Summary,
+				EvaluatorReportRef: job.EvaluatorReportRef,
+			}
+		}
+		return s.startChainGoal(ctx, latest, job.WorkspaceDir, latest.CurrentIndex+1, prevCtx)
 	case domain.JobStatusBlocked, domain.JobStatusFailed:
 		current.Status = domain.ChainGoalStatusFailed
 		chain.Status = domain.ChainStatusFailed

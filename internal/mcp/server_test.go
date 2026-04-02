@@ -1,8 +1,10 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -160,7 +162,7 @@ func TestToolStartChainReturnsChainIDAndStatus(t *testing.T) {
 	waitForChainStatus(t, service, started.ChainID, "done")
 }
 
-func TestStatusToolsExposeOptionalWaitSchema(t *testing.T) {
+func TestStatusToolsExposeWaitSchema(t *testing.T) {
 	tools := toolList()
 
 	assertWaitSchema := func(name string) {
@@ -177,9 +179,19 @@ func TestStatusToolsExposeOptionalWaitSchema(t *testing.T) {
 			if prop.Type != "boolean" {
 				t.Fatalf("%s wait property type = %q, want boolean", name, prop.Type)
 			}
+			timeoutProp, ok := tool.InputSchema.Properties["wait_timeout"]
+			if !ok {
+				t.Fatalf("%s schema missing wait_timeout property", name)
+			}
+			if timeoutProp.Type != "integer" {
+				t.Fatalf("%s wait_timeout property type = %q, want integer", name, timeoutProp.Type)
+			}
+			if timeoutProp.Default != 30 {
+				t.Fatalf("%s wait_timeout default = %#v, want 30", name, timeoutProp.Default)
+			}
 			for _, required := range tool.InputSchema.Required {
-				if required == "wait" {
-					t.Fatalf("%s wait property must be optional", name)
+				if required == "wait" || required == "wait_timeout" {
+					t.Fatalf("%s %s property must be optional", name, required)
 				}
 			}
 			return
@@ -189,6 +201,34 @@ func TestStatusToolsExposeOptionalWaitSchema(t *testing.T) {
 
 	assertWaitSchema("gorchera_status")
 	assertWaitSchema("gorchera_chain_status")
+}
+
+func TestStatusWaitDurationSemantics(t *testing.T) {
+	t.Run("wait disabled", func(t *testing.T) {
+		if got := statusWaitDuration(map[string]any{"wait_timeout": 99}, false); got != 0 {
+			t.Fatalf("wait=false duration = %v, want 0", got)
+		}
+	})
+
+	t.Run("omitted wait timeout defaults to 30 seconds", func(t *testing.T) {
+		setStatusWaitTimings(t, 20*time.Millisecond, 5*time.Minute)
+		if got := statusWaitDuration(map[string]any{}, true); got != 30*time.Second {
+			t.Fatalf("omitted wait_timeout duration = %v, want %v", got, 30*time.Second)
+		}
+	})
+
+	t.Run("zero wait timeout preserves status wait timeout", func(t *testing.T) {
+		setStatusWaitTimings(t, 20*time.Millisecond, 150*time.Millisecond)
+		if got := statusWaitDuration(map[string]any{"wait_timeout": 0}, true); got != 150*time.Millisecond {
+			t.Fatalf("wait_timeout=0 duration = %v, want %v", got, 150*time.Millisecond)
+		}
+	})
+
+	t.Run("positive wait timeout uses seconds", func(t *testing.T) {
+		if got := statusWaitDuration(map[string]any{"wait_timeout": 7}, true); got != 7*time.Second {
+			t.Fatalf("wait_timeout=7 duration = %v, want %v", got, 7*time.Second)
+		}
+	})
 }
 
 func TestToolStatusWaitFalseReturnsImmediately(t *testing.T) {
@@ -320,6 +360,74 @@ func TestToolStatusWaitTimeoutReturnsLatestSnapshot(t *testing.T) {
 	}
 }
 
+func TestToolStatusWaitTimeoutZeroUsesStatusWaitTimeout(t *testing.T) {
+	setStatusWaitTimings(t, 20*time.Millisecond, 120*time.Millisecond)
+
+	control := newMCPWaitProvider("mcp-wait-timeout-zero")
+	server, service, _ := newTestServer(t, control)
+	workspace := t.TempDir()
+
+	job := startMCPJob(t, server, workspace, string(control.name))
+	t.Cleanup(func() {
+		cancelJobForCleanup(t, service, job.ID)
+	})
+
+	start := time.Now()
+	result, err := server.toolStatus(context.Background(), map[string]any{
+		"job_id":       job.ID,
+		"wait":         true,
+		"wait_timeout": 0,
+	})
+	if err != nil {
+		t.Fatalf("toolStatus returned error: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed < 100*time.Millisecond {
+		t.Fatalf("toolStatus wait_timeout=0 returned too quickly: %v", elapsed)
+	}
+
+	var current domain.Job
+	if err := json.Unmarshal([]byte(toolResultText(t, result)), &current); err != nil {
+		t.Fatalf("failed to decode job status: %v", err)
+	}
+	if isTerminalJobStatus(current.Status) {
+		t.Fatalf("expected non-terminal snapshot after wait_timeout=0 timeout, got %s", current.Status)
+	}
+}
+
+func TestToolStatusWaitTimeoutPositiveUsesProvidedSeconds(t *testing.T) {
+	setStatusWaitTimings(t, 10*time.Millisecond, 5*time.Minute)
+
+	control := newMCPWaitProvider("mcp-wait-timeout-positive")
+	server, service, _ := newTestServer(t, control)
+	workspace := t.TempDir()
+
+	job := startMCPJob(t, server, workspace, string(control.name))
+	t.Cleanup(func() {
+		cancelJobForCleanup(t, service, job.ID)
+	})
+
+	start := time.Now()
+	result, err := server.toolStatus(context.Background(), map[string]any{
+		"job_id":       job.ID,
+		"wait":         true,
+		"wait_timeout": 1,
+	})
+	if err != nil {
+		t.Fatalf("toolStatus returned error: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed < 900*time.Millisecond {
+		t.Fatalf("toolStatus wait_timeout=1 returned too quickly: %v", elapsed)
+	}
+
+	var current domain.Job
+	if err := json.Unmarshal([]byte(toolResultText(t, result)), &current); err != nil {
+		t.Fatalf("failed to decode job status: %v", err)
+	}
+	if isTerminalJobStatus(current.Status) {
+		t.Fatalf("expected non-terminal snapshot after positive wait timeout, got %s", current.Status)
+	}
+}
+
 func TestToolChainStatusWaitReturnsDoneAfterTerminalState(t *testing.T) {
 	setStatusWaitTimings(t, 20*time.Millisecond, time.Second)
 
@@ -387,6 +495,80 @@ func TestToolChainStatusWaitTimeoutReturnsLatestSnapshot(t *testing.T) {
 	}
 	if isTerminalChainStatus(chain.Status) {
 		t.Fatalf("expected non-terminal chain snapshot after timeout, got %s", chain.Status)
+	}
+}
+
+func TestToolChainStatusWaitTimeoutZeroUsesStatusWaitTimeout(t *testing.T) {
+	setStatusWaitTimings(t, 20*time.Millisecond, 120*time.Millisecond)
+
+	control := &mcpChainProvider{
+		name:    domain.ProviderName("mcp-chain-timeout-zero"),
+		release: make(chan struct{}),
+	}
+	server, service, _ := newTestServer(t, control)
+	workspace := t.TempDir()
+
+	chainID := startMCPChain(t, server, workspace, string(control.name))
+	t.Cleanup(func() {
+		cancelChainForCleanup(t, service, chainID)
+	})
+
+	start := time.Now()
+	result, err := server.toolChainStatus(context.Background(), map[string]any{
+		"chain_id":     chainID,
+		"wait":         true,
+		"wait_timeout": 0,
+	})
+	if err != nil {
+		t.Fatalf("toolChainStatus returned error: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed < 100*time.Millisecond {
+		t.Fatalf("toolChainStatus wait_timeout=0 returned too quickly: %v", elapsed)
+	}
+
+	var chain domain.JobChain
+	if err := json.Unmarshal([]byte(toolResultText(t, result)), &chain); err != nil {
+		t.Fatalf("failed to decode chain status: %v", err)
+	}
+	if isTerminalChainStatus(chain.Status) {
+		t.Fatalf("expected non-terminal chain snapshot after wait_timeout=0 timeout, got %s", chain.Status)
+	}
+}
+
+func TestToolChainStatusWaitTimeoutPositiveUsesProvidedSeconds(t *testing.T) {
+	setStatusWaitTimings(t, 10*time.Millisecond, 5*time.Minute)
+
+	control := &mcpChainProvider{
+		name:    domain.ProviderName("mcp-chain-timeout-positive"),
+		release: make(chan struct{}),
+	}
+	server, service, _ := newTestServer(t, control)
+	workspace := t.TempDir()
+
+	chainID := startMCPChain(t, server, workspace, string(control.name))
+	t.Cleanup(func() {
+		cancelChainForCleanup(t, service, chainID)
+	})
+
+	start := time.Now()
+	result, err := server.toolChainStatus(context.Background(), map[string]any{
+		"chain_id":     chainID,
+		"wait":         true,
+		"wait_timeout": 1,
+	})
+	if err != nil {
+		t.Fatalf("toolChainStatus returned error: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed < 900*time.Millisecond {
+		t.Fatalf("toolChainStatus wait_timeout=1 returned too quickly: %v", elapsed)
+	}
+
+	var chain domain.JobChain
+	if err := json.Unmarshal([]byte(toolResultText(t, result)), &chain); err != nil {
+		t.Fatalf("failed to decode chain status: %v", err)
+	}
+	if isTerminalChainStatus(chain.Status) {
+		t.Fatalf("expected non-terminal chain snapshot after positive wait timeout, got %s", chain.Status)
 	}
 }
 
@@ -706,4 +888,60 @@ func (p *mcpChainProvider) RunWorker(_ context.Context, _ domain.Job, _ domain.L
 
 func (p *mcpChainProvider) RunEvaluator(_ context.Context, _ domain.Job) (string, error) {
 	return `{"status":"passed","passed":true,"score":100,"reason":"accepted","missing_step_types":[],"evidence":["chain"],"contract_ref":"","verification_report":{"status":"passed","passed":true,"reason":"accepted","evidence":["chain"],"missing_checks":[],"artifacts":[],"contract_ref":""}}`, nil
+}
+
+// TestToolApproveLogsErrorOnFailure verifies that when the background Approve
+// goroutine encounters an error, it logs it rather than silently discarding it.
+// We simulate this by putting a job in a state where Approve will fail
+// (not waiting_approval), so the goroutine logs the error.
+func TestToolApproveLogsErrorOnFailure(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	registry := provider.NewRegistry()
+	svc := orchestrator.NewService(
+		provider.NewSessionManager(registry),
+		store.NewStateStore(filepath.Join(root, "state")),
+		store.NewArtifactStore(filepath.Join(root, "artifacts")),
+		root,
+	)
+	server := NewServer(svc)
+
+	// Save a job in waiting_leader status; Approve will fail because the job is
+	// not in waiting_approval state.
+	job := &domain.Job{
+		ID:           "job-approve-log-test",
+		Goal:         "log error test",
+		WorkspaceDir: root,
+		Status:       domain.JobStatusWaitingLeader,
+		Provider:     domain.ProviderMock,
+		RoleProfiles: domain.DefaultRoleProfiles(domain.ProviderMock),
+		MaxSteps:     1,
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	}
+	stateStore := store.NewStateStore(filepath.Join(root, "state"))
+	if err := stateStore.SaveJob(context.Background(), job); err != nil {
+		t.Fatalf("failed to save job: %v", err)
+	}
+
+	// Redirect the default logger so we can capture output.
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	// toolApprove calls Get (succeeds) then fires a goroutine calling Approve.
+	_, _ = server.toolApprove(context.Background(), map[string]any{"job_id": job.ID})
+
+	// Give the background goroutine time to run and log.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if strings.Contains(buf.String(), "[gorchera] Approve failed for job "+job.ID) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected Approve error to be logged; log output: %q", buf.String())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }

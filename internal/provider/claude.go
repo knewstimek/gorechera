@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"strings"
@@ -115,21 +116,42 @@ func (a *ClaudeAdapter) runStructured(ctx context.Context, workspaceDir, prompt,
 }
 
 func extractJSONResult(output string) string {
-	// Claude --output-format json returns an envelope with either:
-	//   "result" field (text mode) or "structured_output" field (when --json-schema is used)
-	var envelope struct {
-		Result           string          `json:"result"`
-		StructuredOutput json.RawMessage `json:"structured_output"`
-	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &envelope); err != nil {
+	trimmed := strings.TrimSpace(output)
+	if trimmed == "" {
 		return ""
 	}
-	// Prefer structured_output when present and non-null
-	if len(envelope.StructuredOutput) > 0 && string(envelope.StructuredOutput) != "null" {
-		return string(envelope.StructuredOutput)
+
+	// Claude JSON output can wrap the final payload in several envelope shapes
+	// depending on CLI version and structured-output mode. Extract the actual
+	// schema payload when present, otherwise fall back to the raw output.
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(trimmed), &envelope); err != nil {
+		return ""
 	}
-	if envelope.Result != "" {
-		return envelope.Result
+
+	for _, key := range []string{"structured_output", "parsed_output", "result"} {
+		if extracted := extractJSONEnvelopeValue(envelope[key]); extracted != "" {
+			return extracted
+		}
 	}
 	return ""
+}
+
+func extractJSONEnvelopeValue(raw json.RawMessage) string {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return ""
+	}
+
+	// result may be a JSON string containing structured text, while newer
+	// structured-output flows can place the parsed object directly in the field.
+	if raw[0] == '"' {
+		var text string
+		if err := json.Unmarshal(raw, &text); err != nil {
+			return ""
+		}
+		return strings.TrimSpace(text)
+	}
+
+	return string(raw)
 }

@@ -270,4 +270,7 @@ MCP:
 - job tools: start, list, status, events, artifacts, approve, reject, retry, cancel, resume
 - chain tools: start, status, pause, resume, cancel, skip
 - steer tool: `gorchera_steer`
-- `wait=true` is supported on `gorchera_status` and `gorchera_chain_status` with 2-second polling and a 5-minute timeout
+- `wait=true` is supported on `gorchera_status` and `gorchera_chain_status` with 2-second polling
+- Omitted `wait_timeout` defaults to 30 seconds
+- `wait_timeout=0` preserves the original 5-minute timeout
+- Positive `wait_timeout` values are interpreted as seconds

@@ -527,7 +527,7 @@ func stream(args []string) {
 
 func serve(service *orchestrator.Service, args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	addr := fs.String("addr", ":8080", "listen address")
+	addr := fs.String("addr", "127.0.0.1:8080", "listen address")
 	fs.Parse(args)
 
 	server := api.NewServer(service)

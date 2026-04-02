@@ -30,6 +30,10 @@ go run ./cmd/gorchera run -goal "Add a hello function" -provider codex
 go run ./cmd/gorchera status -all
 ```
 
+## Note on Overhead
+
+Gorchera runs a full pipeline (plan -> lead -> execute -> evaluate) for every job. Even trivial tasks incur baseline token cost from planning artifacts, leader coordination, and evaluator gating. For simple one-off tasks, direct execution may be more efficient. Gorchera shines on complex, multi-step tasks where structured decomposition, verification contracts, and audit trails justify the orchestration overhead.
+
 ## MCP Tools
 
 | Tool | Description |
@@ -55,6 +59,18 @@ go run ./cmd/gorchera status -all
 ## Architecture
 
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for package structure, state machine, and core loop.
+
+## Supervisor Guidelines
+
+When using Gorchera with an AI supervisor (e.g., Claude Opus via MCP), the supervisor must follow these rules:
+
+- **Never write code directly.** All code changes must go through `gorchera_start_job` or `gorchera_start_chain`. The supervisor writes goals, not code.
+- **Never diagnose or investigate directly.** Spawning sub-agents to explore the codebase is still "doing it directly." Create a Gorchera audit/review job instead.
+- **Steer, don't intervene.** If a job goes off track, use `gorchera_steer` to redirect. If it fails, use `gorchera_retry` or start a new fix job.
+- **Reading code is allowed only for goal formulation.** The supervisor may read interfaces and types to write better goals, but not to debug or fix issues.
+- **Monitor via status polling.** Use `gorchera_status` / `gorchera_chain_status` to track progress. Use `wait=true` for synchronous blocking.
+
+This separation ensures that all work is auditable, artifact-tracked, and evaluator-gated -- the core value proposition of using an orchestration engine over direct AI coding.
 
 ## Documentation
 

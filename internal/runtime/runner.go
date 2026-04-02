@@ -51,7 +51,7 @@ func (r *Runner) Run(parent context.Context, req Request) (Result, error) {
 
 	cmd := r.CommandFactory(ctx, req.Command, req.Args...)
 	cmd.Dir = req.Dir
-	cmd.Env = append(os.Environ(), r.Environment...)
+	cmd.Env = append(minimalEnv(), r.Environment...)
 	cmd.Env = append(cmd.Env, req.Env...)
 
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -114,6 +114,33 @@ func (r *Runner) Run(parent context.Context, req Request) (Result, error) {
 		return result, waitErr
 	}
 	return result, nil
+}
+
+// minimalEnv returns a minimal environment for subprocesses containing only
+// variables needed for basic OS and Go toolchain operation. This prevents
+// leaking secrets (API keys, tokens, passwords) that callers may have set.
+// Callers may append additional variables via r.Environment or req.Env.
+func minimalEnv() []string {
+	// Safe variables: OS essentials + Go toolchain configuration.
+	// Secrets such as ANTHROPIC_API_KEY, OPENAI_API_KEY, etc. are excluded.
+	safe := []string{
+		"PATH", "SYSTEMROOT", "HOME", "TEMP", "TMP",
+		// Windows user profile dirs (needed by Go build cache)
+		"LOCALAPPDATA", "APPDATA", "USERPROFILE",
+		// Windows shell helpers
+		"COMSPEC", "PATHEXT",
+		// Go toolchain vars (not secrets)
+		"GOCACHE", "GOPATH", "GOROOT", "GOPROXY",
+		"GONOSUMCHECK", "GONOSUMDB", "GONOPROXY", "GOFLAGS",
+		"GOTMPDIR", "CGO_ENABLED",
+	}
+	env := make([]string, 0, len(safe))
+	for _, key := range safe {
+		if val, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+val)
+		}
+	}
+	return env
 }
 
 func exitCodeFromError(err error) int {
