@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -429,6 +430,18 @@ func toolList() []toolDef {
 				Required: []string{"job_id", "message"},
 			},
 		},
+		{
+			Name:        "gorchera_diff",
+			Description: "Show the current git diff for a job workspace using the persisted workspace_dir.",
+			InputSchema: toolInputSchema{
+				Type: "object",
+				Properties: map[string]schemaProp{
+					"job_id":   {Type: "string", Description: "Job ID"},
+					"pathspec": {Type: "string", Description: "Optional git pathspec to restrict the diff to a file or path"},
+				},
+				Required: []string{"job_id"},
+			},
+		},
 	}
 }
 
@@ -495,6 +508,8 @@ func (s *Server) handleToolCall(req jsonRPCRequest) *jsonRPCResponse {
 		result, err = s.toolResume(ctx, args)
 	case "gorchera_steer":
 		result, err = s.toolSteer(ctx, args)
+	case "gorchera_diff":
+		result, err = s.toolDiff(ctx, args)
 	default:
 		return errorResp(req.ID, -32602, fmt.Sprintf("unknown tool: %s", p.Name))
 	}
@@ -828,6 +843,52 @@ func (s *Server) toolArtifacts(ctx context.Context, args map[string]any) (toolRe
 	return jsonResult(all)
 }
 
+func (s *Server) toolDiff(ctx context.Context, args map[string]any) (toolResult, error) {
+	jobID, err := requireStringArg(args, "job_id")
+	if err != nil {
+		return toolResult{}, err
+	}
+	job, err := s.service.Get(ctx, jobID)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return toolResult{}, fmt.Errorf("job not found: %s", jobID)
+		}
+		return toolResult{}, err
+	}
+
+	workspaceDir := strings.TrimSpace(job.WorkspaceDir)
+	if workspaceDir == "" {
+		return toolResult{}, fmt.Errorf("workspace path is missing for job: %s", jobID)
+	}
+	info, err := os.Stat(workspaceDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return toolResult{}, fmt.Errorf("workspace path not found: %s", workspaceDir)
+		}
+		return toolResult{}, fmt.Errorf("stat workspace path %q: %w", workspaceDir, err)
+	}
+	if !info.IsDir() {
+		return toolResult{}, fmt.Errorf("workspace path not found: %s", workspaceDir)
+	}
+
+	if _, err := gitCommandOutput(ctx, workspaceDir, "rev-parse", "--is-inside-work-tree"); err != nil {
+		return toolResult{}, fmt.Errorf("workspace is not a git worktree: %s", workspaceDir)
+	}
+
+	argsv := []string{"diff", "HEAD"}
+	if pathspec := strings.TrimSpace(stringArg(args, "pathspec")); pathspec != "" {
+		argsv = append(argsv, "--", pathspec)
+	}
+	output, err := gitCommandOutput(ctx, workspaceDir, argsv...)
+	if err != nil {
+		return toolResult{}, err
+	}
+	if strings.TrimSpace(output) == "" {
+		return textResult("no changes"), nil
+	}
+	return textResult(output), nil
+}
+
 func (s *Server) toolApprove(ctx context.Context, args map[string]any) (toolResult, error) {
 	jobID, err := requireStringArg(args, "job_id")
 	if err != nil {
@@ -949,6 +1010,20 @@ func jsonResult(v any) (toolResult, error) {
 		return toolResult{}, fmt.Errorf("failed to serialize result: %w", err)
 	}
 	return textResult(string(data)), nil
+}
+
+func gitCommandOutput(ctx context.Context, dir string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = append(os.Environ(),
+		"GIT_CONFIG_GLOBAL="+os.DevNull,
+		"HOME="+dir,
+		"XDG_CONFIG_HOME="+dir,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git %s failed: %s", strings.Join(args, " "), strings.TrimSpace(string(output)))
+	}
+	return string(output), nil
 }
 
 func stringArg(args map[string]any, key string) string {

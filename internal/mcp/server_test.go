@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -272,6 +273,166 @@ func TestStatusToolsExposeWaitSchema(t *testing.T) {
 
 	assertWaitSchema("gorchera_status")
 	assertWaitSchema("gorchera_chain_status")
+}
+
+func TestDiffToolSchemaExposed(t *testing.T) {
+	t.Parallel()
+
+	tools := toolList()
+	for _, tool := range tools {
+		if tool.Name != "gorchera_diff" {
+			continue
+		}
+		jobIDProp, ok := tool.InputSchema.Properties["job_id"]
+		if !ok {
+			t.Fatal("gorchera_diff schema missing job_id")
+		}
+		if jobIDProp.Type != "string" {
+			t.Fatalf("gorchera_diff job_id type = %q, want string", jobIDProp.Type)
+		}
+		pathspecProp, ok := tool.InputSchema.Properties["pathspec"]
+		if !ok {
+			t.Fatal("gorchera_diff schema missing pathspec")
+		}
+		if pathspecProp.Type != "string" {
+			t.Fatalf("gorchera_diff pathspec type = %q, want string", pathspecProp.Type)
+		}
+		if len(tool.InputSchema.Required) != 1 || tool.InputSchema.Required[0] != "job_id" {
+			t.Fatalf("gorchera_diff required = %#v, want [job_id]", tool.InputSchema.Required)
+		}
+		return
+	}
+	t.Fatal("gorchera_diff schema not found")
+}
+
+func TestToolDiffReturnsSharedWorkspaceDiff(t *testing.T) {
+	t.Parallel()
+
+	server, _, root := newTestServer(t, mock.New())
+	workspace := newGitWorkspace(t)
+	if err := os.WriteFile(filepath.Join(workspace, "README.md"), []byte("# test workspace\nshared change\n"), 0o644); err != nil {
+		t.Fatalf("failed to modify shared workspace: %v", err)
+	}
+	job := saveDiffTestJob(t, root, "job-diff-shared", workspace, workspace, string(domain.WorkspaceModeShared))
+
+	result, err := server.toolDiff(context.Background(), map[string]any{"job_id": job.ID})
+	if err != nil {
+		t.Fatalf("toolDiff returned error: %v", err)
+	}
+	text := toolResultText(t, result)
+	if !strings.Contains(text, "diff --git a/README.md b/README.md") {
+		t.Fatalf("expected README diff, got %q", text)
+	}
+	if !strings.Contains(text, "+shared change") {
+		t.Fatalf("expected modified README content in diff, got %q", text)
+	}
+}
+
+func TestToolDiffReturnsIsolatedWorkspaceDiff(t *testing.T) {
+	t.Parallel()
+
+	server, _, root := newTestServer(t, mock.New())
+	workspace := newGitWorkspace(t)
+	worktreeDir := filepath.Join(t.TempDir(), "isolated-worktree")
+	gitRun(t, workspace, "worktree", "add", "--detach", worktreeDir, "HEAD")
+	if err := os.WriteFile(filepath.Join(worktreeDir, "README.md"), []byte("# test workspace\nisolated change\n"), 0o644); err != nil {
+		t.Fatalf("failed to modify isolated workspace: %v", err)
+	}
+	job := saveDiffTestJob(t, root, "job-diff-isolated", worktreeDir, workspace, string(domain.WorkspaceModeIsolated))
+
+	result, err := server.toolDiff(context.Background(), map[string]any{"job_id": job.ID})
+	if err != nil {
+		t.Fatalf("toolDiff returned error: %v", err)
+	}
+	text := toolResultText(t, result)
+	if !strings.Contains(text, "diff --git a/README.md b/README.md") {
+		t.Fatalf("expected README diff, got %q", text)
+	}
+	if !strings.Contains(text, "+isolated change") {
+		t.Fatalf("expected isolated README content in diff, got %q", text)
+	}
+}
+
+func TestToolDiffPathspecRestrictsOutput(t *testing.T) {
+	t.Parallel()
+
+	server, _, root := newTestServer(t, mock.New())
+	workspace := newGitWorkspace(t)
+	if err := os.WriteFile(filepath.Join(workspace, "notes.txt"), []byte("notes base\n"), 0o644); err != nil {
+		t.Fatalf("failed to seed notes.txt: %v", err)
+	}
+	gitRun(t, workspace, "add", "notes.txt")
+	gitRun(t, workspace, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "add notes")
+	if err := os.WriteFile(filepath.Join(workspace, "README.md"), []byte("# test workspace\nreadme change\n"), 0o644); err != nil {
+		t.Fatalf("failed to modify README: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "notes.txt"), []byte("notes change\n"), 0o644); err != nil {
+		t.Fatalf("failed to modify notes.txt: %v", err)
+	}
+	job := saveDiffTestJob(t, root, "job-diff-pathspec", workspace, workspace, string(domain.WorkspaceModeShared))
+
+	result, err := server.toolDiff(context.Background(), map[string]any{
+		"job_id":   job.ID,
+		"pathspec": "README.md",
+	})
+	if err != nil {
+		t.Fatalf("toolDiff returned error: %v", err)
+	}
+	text := toolResultText(t, result)
+	if !strings.Contains(text, "diff --git a/README.md b/README.md") {
+		t.Fatalf("expected README diff, got %q", text)
+	}
+	if strings.Contains(text, "notes.txt") {
+		t.Fatalf("expected notes.txt to be filtered out, got %q", text)
+	}
+}
+
+func TestToolDiffEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	server, _, root := newTestServer(t, mock.New())
+
+	t.Run("unknown job", func(t *testing.T) {
+		resp := server.handleToolCall(mustToolCallRequest(t, "gorchera_diff", map[string]any{
+			"job_id": "job-missing",
+		}))
+		assertToolTextResponse(t, resp, "error: job not found: job-missing")
+	})
+
+	t.Run("missing workspace path", func(t *testing.T) {
+		job := saveDiffTestJob(t, root, "job-diff-no-workspace", "", "", string(domain.WorkspaceModeShared))
+		resp := server.handleToolCall(mustToolCallRequest(t, "gorchera_diff", map[string]any{
+			"job_id": job.ID,
+		}))
+		assertToolTextResponse(t, resp, "error: workspace path is missing for job: "+job.ID)
+	})
+
+	t.Run("workspace path not found", func(t *testing.T) {
+		missingWorkspace := filepath.Join(root, "missing-workspace")
+		job := saveDiffTestJob(t, root, "job-diff-missing-workspace", missingWorkspace, missingWorkspace, string(domain.WorkspaceModeShared))
+		resp := server.handleToolCall(mustToolCallRequest(t, "gorchera_diff", map[string]any{
+			"job_id": job.ID,
+		}))
+		assertToolTextResponse(t, resp, "error: workspace path not found: "+missingWorkspace)
+	})
+
+	t.Run("not a git worktree", func(t *testing.T) {
+		workspace := t.TempDir()
+		job := saveDiffTestJob(t, root, "job-diff-not-git", workspace, workspace, string(domain.WorkspaceModeShared))
+		resp := server.handleToolCall(mustToolCallRequest(t, "gorchera_diff", map[string]any{
+			"job_id": job.ID,
+		}))
+		assertToolTextResponse(t, resp, "error: workspace is not a git worktree: "+workspace)
+	})
+
+	t.Run("no changes", func(t *testing.T) {
+		workspace := newGitWorkspace(t)
+		job := saveDiffTestJob(t, root, "job-diff-no-changes", workspace, workspace, string(domain.WorkspaceModeShared))
+		resp := server.handleToolCall(mustToolCallRequest(t, "gorchera_diff", map[string]any{
+			"job_id": job.ID,
+		}))
+		assertToolTextResponse(t, resp, "no changes")
+	})
 }
 
 func TestStatusWaitDurationSemantics(t *testing.T) {
@@ -852,6 +1013,75 @@ func toolResultText(t *testing.T, result toolResult) string {
 		t.Fatalf("expected one content item, got %d", len(result.Content))
 	}
 	return result.Content[0].Text
+}
+
+func assertToolTextResponse(t *testing.T, resp *jsonRPCResponse, want string) {
+	t.Helper()
+
+	if resp == nil {
+		t.Fatal("expected response")
+	}
+	if resp.Error != nil {
+		t.Fatalf("expected tool text result, got rpc error %#v", resp.Error)
+	}
+	result, ok := resp.Result.(toolResult)
+	if !ok {
+		t.Fatalf("expected toolResult, got %T", resp.Result)
+	}
+	if got := toolResultText(t, result); got != want {
+		t.Fatalf("tool text = %q, want %q", got, want)
+	}
+}
+
+func saveDiffTestJob(t *testing.T, root, jobID, workspaceDir, requestedWorkspaceDir, workspaceMode string) *domain.Job {
+	t.Helper()
+
+	job := &domain.Job{
+		ID:                    jobID,
+		Goal:                  "diff test",
+		WorkspaceDir:          workspaceDir,
+		RequestedWorkspaceDir: requestedWorkspaceDir,
+		WorkspaceMode:         workspaceMode,
+		Status:                domain.JobStatusDone,
+		Provider:              domain.ProviderMock,
+		RoleProfiles:          domain.DefaultRoleProfiles(domain.ProviderMock),
+		MaxSteps:              1,
+		CreatedAt:             time.Now().UTC(),
+		UpdatedAt:             time.Now().UTC(),
+	}
+	stateStore := store.NewStateStore(filepath.Join(root, "state"))
+	if err := stateStore.SaveJob(context.Background(), job); err != nil {
+		t.Fatalf("failed to save job: %v", err)
+	}
+	return job
+}
+
+func newGitWorkspace(t *testing.T) string {
+	t.Helper()
+
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skipf("git is required for diff tests: %v", err)
+	}
+
+	workspace := t.TempDir()
+	if err := os.WriteFile(filepath.Join(workspace, "README.md"), []byte("# test workspace\n"), 0o644); err != nil {
+		t.Fatalf("failed to seed git workspace: %v", err)
+	}
+
+	gitRun(t, workspace, "init")
+	gitRun(t, workspace, "add", "README.md")
+	gitRun(t, workspace, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "init")
+	return workspace
+}
+
+func gitRun(t *testing.T, dir string, args ...string) {
+	t.Helper()
+
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, string(output))
+	}
 }
 
 func waitForJobStatus(t *testing.T, service *orchestrator.Service, jobID string, want domain.JobStatus) {
