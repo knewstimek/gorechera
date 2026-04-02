@@ -1,5 +1,31 @@
 # Changelog
 
+## v2026.04.03-rc1
+
+### Added
+- In-memory job cache for real-time status API (memory truth + disk backup)
+- JobStatusPlanning state for planner phase visibility
+- task_why, invariants_to_preserve, scope_boundary in worker prompts
+- ambition_level parameter (low/medium/high) for worker autonomy control
+- --effort flag support in codex provider
+- gorchera_diff MCP tool for workspace diff inspection
+- Supervisor goal template and role profile guide in CLAUDE.md/README
+- CloneJob deep-copy for cache snapshot isolation
+
+### Fixed
+- Status API stale data during job execution (was reading disk only)
+- Audit V2 CRITICAL XSS-1: showToast innerHTML -> DOM construction
+- Audit V2 HIGH XSS-2: makeBadge class attribute escaping
+- Audit V2 HIGH H1: validatePlanningArtifact value -> pointer receiver
+- Audit V2 HIGH H2: bearer token constant-time comparison
+- Audit V2 HIGH H3: generic HTTP error messages (no internal error leak)
+- Cancel cache race condition (cacheUpdate instead of cacheRemove)
+
+### Changed
+- Reviewer/evaluator/tester prompts hardened with role-specific behavior
+- Leader prompt includes invariants and task_why convention
+- Planner schema includes invariants_to_preserve (required, backward compatible)
+
 ## v2026.04.02 -- First Release
 
 ### Core Engine
