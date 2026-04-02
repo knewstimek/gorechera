@@ -78,21 +78,7 @@ When using Gorchera with an AI supervisor (e.g., Claude Opus via MCP), the super
 
 This separation ensures that all work is auditable, artifact-tracked, and evaluator-gated -- the core value proposition of using an orchestration engine over direct AI coding.
 
-### Writing Effective Goals
-
-Goal quality determines job quality. Terse goals ("fix XSS") produce mechanical execution with subtle bugs. Structure your goals:
-
-```
-Objective: what to achieve
-Why: business/UX impact, real problems encountered
-In-scope: files/modules/features to change
-Out-of-scope: what NOT to touch
-Invariants: things that must NOT break (recovery logic, state machine, existing tests)
-Constraints: technical limits (ASCII only, no new files, specific patterns)
-Done when: completion criteria (build passes, specific behavior verified)
-```
-
-The **Invariants** field is critical -- it carries operational knowledge that the director cannot derive from code alone (e.g., "addEvent() must update the in-memory cache immediately to prevent status API stale data").
+For the full guide on goal writing, ambition levels, invariants, provider presets, and operational tips, see [docs/SUPERVISOR_GUIDE.md](./docs/SUPERVISOR_GUIDE.md).
 
 ## Documentation
 
@@ -100,8 +86,9 @@ The **Invariants** field is critical -- it carries operational knowledge that th
 2. [IMPLEMENTATION_STATUS.md](./docs/IMPLEMENTATION_STATUS.md) -- current state, resolved issues
 3. [PRINCIPLES.md](./docs/PRINCIPLES.md) -- inviolable design principles
 4. [CODING_CONVENTIONS.md](./docs/CODING_CONVENTIONS.md) -- coding rules, extension guides
-5. [ORCHESTRATOR_SPEC_UPDATED.md](./docs/ORCHESTRATOR_SPEC_UPDATED.md) -- detailed design spec
-6. [BLOG_COMPARISON.md](./docs/BLOG_COMPARISON.md) -- comparison with Anthropic's harness engineering blog
+5. [SUPERVISOR_GUIDE.md](./docs/SUPERVISOR_GUIDE.md) -- goal writing, ambition levels, invariants, operational tips
+6. [ORCHESTRATOR_SPEC_UPDATED.md](./docs/ORCHESTRATOR_SPEC_UPDATED.md) -- detailed design spec
+7. [BLOG_COMPARISON.md](./docs/BLOG_COMPARISON.md) -- comparison with Anthropic's harness engineering blog
 
 ## License
 
