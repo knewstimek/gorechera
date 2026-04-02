@@ -72,6 +72,7 @@ func plannerSchema() string {
     "product_scope": {"type": "array", "items": {"type": "string"}},
     "non_goals": {"type": "array", "items": {"type": "string"}},
     "proposed_steps": {"type": "array", "items": {"type": "string"}},
+    "invariants_to_preserve": {"type": "array", "items": {"type": "string"}},
     "acceptance": {"type": "array", "items": {"type": "string"}},
     "success_signals": {"type": "array", "items": {"type": "string"}},
     "recommended_strictness": {"type": "string", "enum": ["strict", "normal", "lenient"]},
@@ -94,7 +95,7 @@ func plannerSchema() string {
       "additionalProperties": false
     }
   },
-  "required": ["goal", "tech_stack", "workspace_dir", "summary", "product_scope", "non_goals", "proposed_steps", "acceptance", "success_signals", "recommended_strictness", "recommended_max_steps", "verification_contract"],
+  "required": ["goal", "tech_stack", "workspace_dir", "summary", "product_scope", "non_goals", "proposed_steps", "invariants_to_preserve", "acceptance", "success_signals", "recommended_strictness", "recommended_max_steps", "verification_contract"],
   "additionalProperties": false
 }`
 }
@@ -221,6 +222,9 @@ Before writing the spec, read the relevant source files in the workspace to unde
 ## Concrete improvement descriptions
 For each planned change, explain what currently exists, what is wrong or missing, and the specific improvement. Avoid vague descriptions. The executor and reviewer must be able to understand exactly what to change and why.
 
+## Invariants to preserve
+List the existing behaviors, contracts, or boundaries that downstream workers must keep intact while making the change. Use an empty array when there are no meaningful invariants.
+
 ## Acceptance criteria
 Include measurable acceptance criteria for each deliverable. Each criterion must be verifiable by the evaluator. Criteria like 'code is clean' are not acceptable -- use criteria like 'function X returns Y when given Z' or 'go test ./... exits 0'.
 
@@ -232,6 +236,7 @@ Output requirements (all fields required in JSON):
 - product_scope: array of what is in scope
 - non_goals: array of what is explicitly out of scope
 - proposed_steps: ordered array of implementation steps
+- invariants_to_preserve: array of behaviors/contracts that must not break during implementation (use [] when none apply)
 - acceptance: array of measurable acceptance criteria
 - success_signals: observable signals that indicate success
 - recommended_strictness: recommend "strict", "normal", or "lenient" based on goal complexity and model capabilities. Stronger models (opus) can handle stricter evaluation and fewer steps; weaker models (sonnet, haiku) benefit from normal strictness and more steps. Use "strict" only for goals requiring review+test coverage with capable models; use "normal" for most goals; use "lenient" for simple or exploratory tasks.
@@ -295,6 +300,7 @@ func buildLeaderPrompt(job domain.Job) string {
 	payload := buildLeaderJobPayload(job)
 	contractPayload := "{}"
 	strictnessLevel := strings.TrimSpace(job.StrictnessLevel)
+	invariantsSection := fmt.Sprintf("Planning invariants to preserve:\n%s\n\n", formatPromptList(job.Constraints, "- None provided."))
 	supervisorSection := ""
 	if strings.TrimSpace(job.SupervisorDirective) != "" {
 		supervisorSection = fmt.Sprintf("Supervisor directive:\n%s\n\n", job.SupervisorDirective)
@@ -350,9 +356,15 @@ For run_system: set action="run_system", target="SYS", task_type=one of "build"/
 For summarize: set action="summarize", reason=summary text
 For complete/fail/blocked: set action, reason=explanation
 
+When dispatching a worker, structure task_text so the worker can parse intent and boundaries quickly:
+- Start with the concrete objective.
+- Include a dedicated task_why: section that explains why this task matters to the job goal right now.
+- Include a dedicated scope_boundary: section that says what the worker must not change, what stays out of scope, or where to stop.
+- Reflect the planning invariants in the task_text when they are relevant to the assigned scope.
+
 %s
 
-%sCurrent job state:
+%s%sCurrent job state:
 %s
 
 Sprint contract:
@@ -360,7 +372,7 @@ Sprint contract:
 If the supervisor directive section is present, follow it with highest priority.
 Supervisor directives override previous plans.
 
-`, job.Goal, strings.Join(completionRules, "\n"), supervisorSection, payload, contractPayload))
+`, job.Goal, strings.Join(completionRules, "\n"), invariantsSection, supervisorSection, payload, contractPayload))
 }
 
 // autoContextMode selects a context mode based on step count thresholds.
@@ -412,6 +424,7 @@ func buildSummaryPayload(job domain.Job) string {
 		Goal                 string        `json:"goal"`
 		Summary              string        `json:"summary,omitempty"`
 		LeaderContextSummary string        `json:"leader_context_summary,omitempty"`
+		Constraints          []string      `json:"constraints,omitempty"`
 		StrictnessLevel      string        `json:"strictness_level,omitempty"`
 		ContextMode          string        `json:"context_mode"`
 		Status               string        `json:"status"`
@@ -440,6 +453,7 @@ func buildSummaryPayload(job domain.Job) string {
 		Goal:                 job.Goal,
 		Summary:              job.Summary,
 		LeaderContextSummary: job.LeaderContextSummary,
+		Constraints:          append([]string(nil), job.Constraints...),
 		StrictnessLevel:      job.StrictnessLevel,
 		ContextMode:          "summary",
 		Status:               string(job.Status),
@@ -477,6 +491,7 @@ func buildMinimalPayload(job domain.Job) string {
 		Goal                 string       `json:"goal"`
 		Summary              string       `json:"summary,omitempty"`
 		LeaderContextSummary string       `json:"leader_context_summary,omitempty"`
+		Constraints          []string     `json:"constraints,omitempty"`
 		StrictnessLevel      string       `json:"strictness_level,omitempty"`
 		ContextMode          string       `json:"context_mode"`
 		Status               string       `json:"status"`
@@ -492,6 +507,7 @@ func buildMinimalPayload(job domain.Job) string {
 		Goal:                 job.Goal,
 		Summary:              job.Summary,
 		LeaderContextSummary: job.LeaderContextSummary,
+		Constraints:          append([]string(nil), job.Constraints...),
 		StrictnessLevel:      job.StrictnessLevel,
 		ContextMode:          "minimal",
 		Status:               string(job.Status),
@@ -516,10 +532,112 @@ func buildMinimalPayload(job domain.Job) string {
 	return string(raw)
 }
 
+type workerTaskContext struct {
+	Objective     string
+	Why           string
+	ScopeBoundary string
+}
+
+func formatPromptList(values []string, empty string) string {
+	if len(values) == 0 {
+		return empty
+	}
+	var b strings.Builder
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString("- ")
+		b.WriteString(value)
+	}
+	if b.Len() == 0 {
+		return empty
+	}
+	return b.String()
+}
+
+func parseWorkerTaskContext(taskText, fallbackWhy string) workerTaskContext {
+	ctx := workerTaskContext{
+		Objective: strings.TrimSpace(taskText),
+	}
+	sections := map[string][]string{
+		"objective":      {},
+		"why":            {},
+		"scope_boundary": {},
+	}
+	current := "objective"
+	seenStructured := false
+	for _, line := range strings.Split(taskText, "\n") {
+		if section, value, ok := parseTaskSectionHeader(line); ok {
+			current = section
+			seenStructured = true
+			if value != "" {
+				sections[current] = append(sections[current], value)
+			}
+			continue
+		}
+		sections[current] = append(sections[current], line)
+	}
+	if seenStructured {
+		if objective := strings.TrimSpace(strings.Join(sections["objective"], "\n")); objective != "" {
+			ctx.Objective = objective
+		}
+		ctx.Why = strings.TrimSpace(strings.Join(sections["why"], "\n"))
+		ctx.ScopeBoundary = strings.TrimSpace(strings.Join(sections["scope_boundary"], "\n"))
+	}
+	if ctx.Objective == "" {
+		ctx.Objective = strings.TrimSpace(taskText)
+	}
+	if ctx.Why == "" {
+		ctx.Why = strings.TrimSpace(fallbackWhy)
+	}
+	if ctx.Why == "" {
+		ctx.Why = "Not provided."
+	}
+	if ctx.ScopeBoundary == "" {
+		ctx.ScopeBoundary = "Only perform the assigned task and stay within the stated file, workspace, and contract limits."
+	}
+	return ctx
+}
+
+func parseTaskSectionHeader(line string) (string, string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return "", "", false
+	}
+	content := strings.TrimLeft(trimmed, "-*# ")
+	normalized := strings.ToLower(content)
+	for _, candidate := range []struct {
+		labels  []string
+		section string
+	}{
+		{labels: []string{"task why", "task_why", "why"}, section: "why"},
+		{labels: []string{"scope boundary", "scope_boundary", "scope"}, section: "scope_boundary"},
+		{labels: []string{"objective", "task", "assigned task"}, section: "objective"},
+	} {
+		for _, label := range candidate.labels {
+			if normalized == label {
+				return candidate.section, "", true
+			}
+			prefix := label + ":"
+			if strings.HasPrefix(normalized, prefix) {
+				return candidate.section, strings.TrimSpace(content[len(prefix):]), true
+			}
+		}
+	}
+	return "", "", false
+}
+
 func buildWorkerPrompt(job domain.Job, task domain.LeaderOutput) string {
 	jobPayload, _ := json.MarshalIndent(job, "", "  ")
 	taskPayload, _ := json.MarshalIndent(task, "", "  ")
 	contractPayload := "{}"
+	taskContext := parseWorkerTaskContext(task.TaskText, job.LeaderContextSummary)
+	invariantsSection := formatPromptList(job.Constraints, "- None provided.")
 	if job.VerificationContract != nil {
 		if data, err := json.MarshalIndent(job.VerificationContract, "", "  "); err == nil {
 			contractPayload = string(data)
@@ -542,7 +660,19 @@ status MUST be one of: success, failed, blocked.
 
 Overall job goal: %s
 
-Assigned %s task:
+Task objective:
+%s
+
+Task why:
+%s
+
+Invariants to preserve:
+%s
+
+Scope boundary:
+%s
+
+Assigned %s task payload:
 %s
 
 Review procedure:
@@ -560,7 +690,7 @@ Job state:
 
 Verification contract:
 %s
-`, reviewerLabel, job.Goal, reviewerLabel, string(taskPayload), string(jobPayload), contractPayload))
+`, reviewerLabel, job.Goal, taskContext.Objective, taskContext.Why, invariantsSection, taskContext.ScopeBoundary, reviewerLabel, string(taskPayload), string(jobPayload), contractPayload))
 	case domain.RoleTester:
 		return strings.TrimSpace(fmt.Sprintf(`
 TASK: You are a tester component assigned by the leader. Your job is to verify behavior, challenge assumptions with runnable checks, and report whether the requested outcome is actually demonstrated.
@@ -570,7 +700,19 @@ status MUST be one of: success, failed, blocked.
 
 Overall job goal: %s
 
-Assigned test task:
+Task objective:
+%s
+
+Task why:
+%s
+
+Invariants to preserve:
+%s
+
+Scope boundary:
+%s
+
+Assigned test task payload:
 %s
 
 Testing procedure:
@@ -584,7 +726,7 @@ Job state:
 
 Verification contract:
 %s
-`, job.Goal, string(taskPayload), string(jobPayload), contractPayload))
+`, job.Goal, taskContext.Objective, taskContext.Why, invariantsSection, taskContext.ScopeBoundary, string(taskPayload), string(jobPayload), contractPayload))
 	}
 	return strings.TrimSpace(fmt.Sprintf(`
 TASK: You are an executor worker assigned by the leader. You perform the implementation task described below. Report results accurately including files changed, commands run, and any errors encountered.
@@ -594,7 +736,19 @@ status MUST be one of: success, failed, blocked.
 
 Overall job goal: %s
 
-Assigned task:
+Task objective:
+%s
+
+Task why:
+%s
+
+Invariants to preserve:
+%s
+
+Scope boundary:
+%s
+
+Assigned task payload:
 %s
 
 File management rules:
@@ -609,7 +763,7 @@ Job state:
 
 Verification contract:
 %s
-`, job.Goal, string(taskPayload), string(jobPayload), contractPayload))
+`, job.Goal, taskContext.Objective, taskContext.Why, invariantsSection, taskContext.ScopeBoundary, string(taskPayload), string(jobPayload), contractPayload))
 }
 
 func profilePrompt(role domain.RoleName, job domain.Job) string {

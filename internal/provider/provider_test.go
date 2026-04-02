@@ -1041,6 +1041,12 @@ func TestPlannerAndEvaluatorPromptsIncludeVerificationContract(t *testing.T) {
 	if !strings.Contains(plannerPrompt, "verification_contract") {
 		t.Fatal("expected planner prompt to include verification contract schema guidance")
 	}
+	if !strings.Contains(plannerPrompt, "invariants_to_preserve") {
+		t.Fatal("expected planner prompt to request invariants_to_preserve")
+	}
+	if !strings.Contains(plannerPrompt, "use [] when none apply") {
+		t.Fatal("expected planner prompt to require an empty invariants array when none apply")
+	}
 	evaluatorPrompt := buildEvaluatorPrompt(job)
 	if !strings.Contains(evaluatorPrompt, "Verification contract") {
 		t.Fatal("expected evaluator prompt to include verification contract payload")
@@ -1057,19 +1063,44 @@ func TestPlannerAndEvaluatorPromptsIncludeVerificationContract(t *testing.T) {
 	if !strings.Contains(workerPrompt, "verification contract") {
 		t.Fatal("expected worker prompt to include verification contract payload")
 	}
+	if !strings.Contains(workerPrompt, "Task why:") || !strings.Contains(workerPrompt, "Scope boundary:") {
+		t.Fatal("expected worker prompt to render task why and scope boundary sections")
+	}
+}
+
+func TestPlannerSchemaUsesStrictRequiredProperties(t *testing.T) {
+	t.Parallel()
+
+	var doc struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+		Required   []string                   `json:"required"`
+	}
+	if err := json.Unmarshal([]byte(plannerSchema()), &doc); err != nil {
+		t.Fatalf("failed to decode planner schema: %v", err)
+	}
+	if _, ok := doc.Properties["invariants_to_preserve"]; !ok {
+		t.Fatal("expected planner schema to declare invariants_to_preserve")
+	}
+	if !containsString(doc.Required, "invariants_to_preserve") {
+		t.Fatal("expected planner schema to require invariants_to_preserve in strict mode")
+	}
+	if len(doc.Properties) != len(doc.Required) {
+		t.Fatalf("expected strict schema to require every top-level property, got %d properties and %d required entries", len(doc.Properties), len(doc.Required))
+	}
 }
 
 func TestReviewerPromptUsesAdversarialGuidance(t *testing.T) {
 	t.Parallel()
 
 	prompt := buildWorkerPrompt(domain.Job{
-		Goal:     "Harden restart safety",
-		Provider: domain.ProviderMock,
+		Goal:        "Harden restart safety",
+		Provider:    domain.ProviderMock,
+		Constraints: []string{"Do not break retry idempotency"},
 	}, domain.LeaderOutput{
 		Action:   "run_worker",
 		Target:   "C",
 		TaskType: "review",
-		TaskText: "Review the recovery patch for regressions",
+		TaskText: "Review the recovery patch for regressions\n\ntask_why: validate lifecycle safety before completion\n\nscope_boundary: stay within the recovery patch and adjacent tests",
 	})
 
 	if !strings.Contains(prompt, "You are a reviewer component") {
@@ -1080,6 +1111,12 @@ func TestReviewerPromptUsesAdversarialGuidance(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "idempotency") || !strings.Contains(prompt, "state-transition") {
 		t.Fatal("expected reviewer prompt to mention lifecycle invariants")
+	}
+	if !strings.Contains(prompt, "Task why:\nvalidate lifecycle safety before completion") {
+		t.Fatal("expected reviewer prompt to render parsed task why")
+	}
+	if !strings.Contains(prompt, "Invariants to preserve:\n- Do not break retry idempotency") {
+		t.Fatal("expected reviewer prompt to render invariants")
 	}
 }
 
@@ -1102,14 +1139,66 @@ func TestAuditTaskUsesReviewerPromptBranch(t *testing.T) {
 	if !strings.Contains(prompt, "risk discovery and contract validation") {
 		t.Fatal("expected audit prompt to stay risk-focused")
 	}
+	if !strings.Contains(prompt, "Task why:") || !strings.Contains(prompt, "Scope boundary:") {
+		t.Fatal("expected audit prompt to include contextual sections")
+	}
+}
+
+func TestWorkerPromptRendersContextSectionsAcrossRoles(t *testing.T) {
+	t.Parallel()
+
+	job := domain.Job{
+		Goal:                 "Propagate prompt context safely",
+		Provider:             domain.ProviderMock,
+		Constraints:          []string{"Keep reviewer/tester separation intact", "Do not modify evaluator prompts"},
+		LeaderContextSummary: "Workers need task intent to avoid stale-status bugs.",
+	}
+	taskText := "Implement prompt updates in protocol.go\n\ntask_why: workers need intent and invariants to avoid stale-status bugs\n\nscope_boundary: limit changes to prompt construction and related tests"
+
+	cases := []struct {
+		name     string
+		taskType string
+		roleText string
+	}{
+		{name: "executor", taskType: "implement", roleText: "You are an executor worker"},
+		{name: "reviewer", taskType: "review", roleText: "You are a reviewer component"},
+		{name: "tester", taskType: "test", roleText: "You are a tester component"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			prompt := buildWorkerPrompt(job, domain.LeaderOutput{
+				Action:   "run_worker",
+				Target:   "B",
+				TaskType: tc.taskType,
+				TaskText: taskText,
+			})
+			if !strings.Contains(prompt, tc.roleText) {
+				t.Fatalf("expected role-specific prompt text %q", tc.roleText)
+			}
+			if !strings.Contains(prompt, "Task why:\nworkers need intent and invariants to avoid stale-status bugs") {
+				t.Fatal("expected task why section in worker prompt")
+			}
+			if !strings.Contains(prompt, "Invariants to preserve:\n- Keep reviewer/tester separation intact\n- Do not modify evaluator prompts") {
+				t.Fatal("expected invariants section in worker prompt")
+			}
+			if !strings.Contains(prompt, "Scope boundary:\nlimit changes to prompt construction and related tests") {
+				t.Fatal("expected scope boundary section in worker prompt")
+			}
+		})
+	}
 }
 
 func TestLeaderPromptIncludesRunWorkersGuidance(t *testing.T) {
 	t.Parallel()
 
 	prompt := buildLeaderPrompt(domain.Job{
-		Goal:     "Fan out parallel work",
-		Provider: domain.ProviderMock,
+		Goal:        "Fan out parallel work",
+		Provider:    domain.ProviderMock,
+		Constraints: []string{"Keep reviewer/tester separation intact"},
 	})
 	if !strings.Contains(prompt, "run_workers") {
 		t.Fatal("expected leader prompt to mention run_workers")
@@ -1123,6 +1212,12 @@ func TestLeaderPromptIncludesRunWorkersGuidance(t *testing.T) {
 	}
 	if !strings.Contains(prompt, `"audit"`) {
 		t.Fatal("expected leader prompt to mention audit task type")
+	}
+	if !strings.Contains(prompt, "Planning invariants to preserve:\n- Keep reviewer/tester separation intact") {
+		t.Fatal("expected leader prompt to include planning invariants")
+	}
+	if !strings.Contains(prompt, "task_why:") || !strings.Contains(prompt, "scope_boundary:") {
+		t.Fatal("expected leader prompt to instruct task_why and scope_boundary shaping")
 	}
 }
 
@@ -1678,6 +1773,15 @@ func assertClaudeJSONSchemaMinified(t *testing.T, args []string) {
 func containsArg(args []string, want string) bool {
 	for _, arg := range args {
 		if arg == want {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
 			return true
 		}
 	}

@@ -71,6 +71,7 @@ func (s *Service) persistPlanning(ctx context.Context, job *domain.Job, planning
 	job.VerificationContract = buildPersistedVerificationContract(*job, planning, contract, verification, verificationPath)
 	job.VerificationContractRef = verificationPath
 	job.PlanningArtifacts = []string{specPath, planPath, contractPath, verificationPath}
+	job.Constraints = uniqueStrings(append(append([]string(nil), job.Constraints...), planning.InvariantsToPreserve...))
 	job.Summary = planning.Summary
 	job.LeaderContextSummary = planning.Summary
 	s.addEvent(job, "job_planned", fmt.Sprintf("planned %d artifacts", len(job.PlanningArtifacts)))
@@ -108,6 +109,10 @@ func buildPlanningArtifact(job domain.Job, seed *domain.PlanningArtifact) domain
 	if seed != nil && len(seed.ProposedSteps) > 0 {
 		proposedSteps = append([]string(nil), seed.ProposedSteps...)
 	}
+	invariants := append([]string(nil), job.Constraints...)
+	if seed != nil && len(seed.InvariantsToPreserve) > 0 {
+		invariants = append(invariants, seed.InvariantsToPreserve...)
+	}
 	acceptance := append([]string(nil), job.DoneCriteria...)
 	var successSignals []string
 	if seed != nil && len(seed.SuccessSignals) > 0 {
@@ -121,6 +126,7 @@ func buildPlanningArtifact(job domain.Job, seed *domain.PlanningArtifact) domain
 		ProductScope:         productScope,
 		NonGoals:             nonGoals,
 		ProposedSteps:        proposedSteps,
+		InvariantsToPreserve: uniqueStrings(invariants),
 		Acceptance:           acceptance,
 		SuccessSignals:       successSignals,
 		VerificationContract: cloneVerificationContract(seed),
@@ -154,6 +160,12 @@ func planningMarkdown(plan domain.PlanningArtifact) string {
 	}
 	b.WriteString("\n## Proposed Steps\n")
 	for _, item := range plan.ProposedSteps {
+		b.WriteString("- ")
+		b.WriteString(item)
+		b.WriteString("\n")
+	}
+	b.WriteString("\n## Invariants To Preserve\n")
+	for _, item := range plan.InvariantsToPreserve {
 		b.WriteString("- ")
 		b.WriteString(item)
 		b.WriteString("\n")

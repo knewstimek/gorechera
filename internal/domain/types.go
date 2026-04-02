@@ -246,6 +246,7 @@ type PlanningArtifact struct {
 	ProductScope          []string              `json:"product_scope,omitempty"`
 	NonGoals              []string              `json:"non_goals,omitempty"`
 	ProposedSteps         []string              `json:"proposed_steps,omitempty"`
+	InvariantsToPreserve  []string              `json:"invariants_to_preserve,omitempty"`
 	Acceptance            []string              `json:"acceptance,omitempty"`
 	SuccessSignals        []string              `json:"success_signals,omitempty"`
 	VerificationContract  *VerificationContract `json:"verification_contract,omitempty"`

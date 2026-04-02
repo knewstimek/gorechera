@@ -74,6 +74,45 @@ func TestServiceStartCompletesMockLoop(t *testing.T) {
 	}
 }
 
+func TestServiceStartHandlesPlannerOutputWithoutInvariants(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	registry := provider.NewRegistry()
+	registry.Register(mock.New())
+
+	service := orchestrator.NewService(
+		provider.NewSessionManager(registry),
+		store.NewStateStore(filepath.Join(root, "state")),
+		store.NewArtifactStore(filepath.Join(root, "artifacts")),
+		root,
+	)
+
+	job, err := service.Start(context.Background(), orchestrator.CreateJobInput{
+		Goal:         "Handle legacy planner output without invariants",
+		Provider:     domain.ProviderMock,
+		WorkspaceDir: root,
+		MaxSteps:     8,
+	})
+	if err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+	if len(job.Constraints) != 0 {
+		t.Fatalf("expected omitted planner invariants to degrade to no job constraints, got %v", job.Constraints)
+	}
+
+	stored, err := service.Get(context.Background(), job.ID)
+	if err != nil {
+		t.Fatalf("Get returned error: %v", err)
+	}
+	if len(stored.Constraints) != 0 {
+		t.Fatalf("expected persisted job constraints to remain empty, got %v", stored.Constraints)
+	}
+	if len(stored.PlanningArtifacts) != 4 {
+		t.Fatalf("expected planning artifacts to persist, got %d", len(stored.PlanningArtifacts))
+	}
+}
+
 func TestServiceStartRejectsInvalidWorkspaceBeforePersistence(t *testing.T) {
 	t.Parallel()
 
