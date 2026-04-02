@@ -209,7 +209,7 @@ function fetchJobs() {
 function renderJobList(jobs) {
 	var el = document.getElementById('job-list');
 	if (!jobs.length) {
-		el.innerHTML = '<p class="loading">No jobs found.</p>';
+		renderEmptyState(el, 'No jobs found', 'Jobs will appear here when created. Try adjusting your filters.');
 		return;
 	}
 	var html = '';
@@ -218,13 +218,19 @@ function renderJobList(jobs) {
 		var sel = job.id === currentJobId ? ' selected' : '';
 		html += '<div class="list-item' + sel + '" data-job-id="' + esc(job.id) + '">';
 		html += '<div class="list-item-header">';
-		html += '<span class="list-item-id">' + esc(job.id) + '</span>';
+		html += '<span class="list-item-id job-id-copy" data-id="' + esc(job.id) + '">' + esc(job.id) + '</span>';
 		html += makeBadge(job.status);
 		html += '</div>';
 		html += '<div class="list-item-goal">' + esc(truncate(job.goal, 80)) + '</div>';
+		if (job.updated_at || job.created_at) {
+			var ts = job.updated_at || job.created_at;
+			html += '<div class="list-item-time"><span data-timestamp="' + esc(ts) + '"></span></div>';
+		}
 		html += '</div>';
 	}
 	el.innerHTML = html;
+	relativeTimeUpdate();
+	makeCopyable(el, '.job-id-copy', function(elem) { return elem.getAttribute('data-id') || ''; });
 }
 
 function fetchJobDetail(id) {
@@ -264,6 +270,23 @@ function renderJobDetail(job) {
 
 	// Token usage
 	renderTokenUsage(job.token_usage);
+
+	// Sparkline for per-step token trend
+	var sparkTokens = [];
+	var jobStepsArr = job.steps || [];
+	for (var si = 0; si < jobStepsArr.length; si++) {
+		var su = jobStepsArr[si].token_usage;
+		if (su && su.total_tokens) sparkTokens.push(su.total_tokens);
+	}
+	if (sparkTokens.length >= 2) {
+		var tokenEl = document.getElementById('detail-token-usage');
+		if (tokenEl) {
+			var sparkWrap = document.createElement('div');
+			sparkWrap.style.cssText = 'padding:4px 0;display:flex;align-items:center;gap:8px';
+			sparkWrap.innerHTML = '<span style="font-size:11px;color:var(--text-secondary)">Steps:</span>' + renderSparkline(sparkTokens);
+			tokenEl.appendChild(sparkWrap);
+		}
+	}
 
 	// Steps
 	renderSteps(job.steps || []);
@@ -394,14 +417,20 @@ function openSSE(jobId, job) {
 	var sseEl = document.getElementById('detail-sse-events');
 	sseEl.innerHTML = '';
 	setSSEIndicator('sse-connecting', 'Connecting...');
+	updateConnectionStatus('connecting');
 
 	var es = new EventSource(BASE_URL + '/jobs/' + jobId + '/events/stream');
 	activeSSE = es;
+
+	es.onopen = function() {
+		updateConnectionStatus('connected');
+	};
 
 	es.addEventListener('job_event', function(e) {
 		try {
 			var ev = JSON.parse(e.data);
 			setSSEIndicator('sse-on', 'Live');
+			updateConnectionStatus('connected');
 
 			var item = document.createElement('div');
 			item.className = 'event-item sse-event-new';
@@ -418,15 +447,27 @@ function openSSE(jobId, job) {
 
 			// When the job reaches a terminal state via SSE, close and refresh
 			var k = ev.kind || '';
-			if (k === 'job_done' || k === 'job_failed' || k === 'job_cancelled') {
+			if (k === 'job_done') {
+				showToast('Job completed: ' + jobId, 'success');
 				closeSSE();
 				fetchJobDetail(jobId);
+			} else if (k === 'job_failed') {
+				showToast('Job failed: ' + jobId, 'error');
+				closeSSE();
+				fetchJobDetail(jobId);
+			} else if (k === 'job_cancelled') {
+				showToast('Job cancelled: ' + jobId, 'info');
+				closeSSE();
+				fetchJobDetail(jobId);
+			} else if (k === 'approval_requested' || k === 'waiting_approval') {
+				showToast('Approval required for: ' + jobId, 'info');
 			}
 		} catch(ex) {}
 	});
 
 	es.onerror = function() {
 		setSSEIndicator('sse-off', 'Disconnected');
+		updateConnectionStatus('disconnected');
 	};
 }
 
@@ -528,7 +569,7 @@ function fetchChains() {
 function renderChainList(chains) {
 	var el = document.getElementById('chain-list');
 	if (!chains.length) {
-		el.innerHTML = '<p class="loading">No chains found.</p>';
+		renderEmptyState(el, 'No chains found', 'Chains will appear here when created.');
 		return;
 	}
 	var html = '';
@@ -537,7 +578,7 @@ function renderChainList(chains) {
 		var sel = chain.id === currentChainId ? ' selected' : '';
 		html += '<div class="list-item' + sel + '" data-chain-id="' + esc(chain.id) + '">';
 		html += '<div class="list-item-header">';
-		html += '<span class="list-item-id">' + esc(chain.id) + '</span>';
+		html += '<span class="list-item-id chain-id-copy" data-id="' + esc(chain.id) + '">' + esc(chain.id) + '</span>';
 		html += makeBadge(chain.status);
 		html += '</div>';
 		var goals = chain.goals || [];
@@ -552,9 +593,15 @@ function renderChainList(chains) {
 		} else {
 			html += '<div class="list-item-goal">' + esc(truncate(chain.goal || '', 80)) + '</div>';
 		}
+		if (chain.updated_at || chain.created_at) {
+			var ts = chain.updated_at || chain.created_at;
+			html += '<div class="list-item-time"><span data-timestamp="' + esc(ts) + '"></span></div>';
+		}
 		html += '</div>';
 	}
 	el.innerHTML = html;
+	relativeTimeUpdate();
+	makeCopyable(el, '.chain-id-copy', function(elem) { return elem.getAttribute('data-id') || ''; });
 }
 
 function fetchChainDetail(id) {
@@ -780,3 +827,220 @@ function startAutoRefresh() {
 
 fetchJobs();
 startAutoRefresh();
+
+// =====================================================================
+// UX ENHANCEMENTS
+// =====================================================================
+
+// --- Toast notification system ---
+var toastCounter = 0;
+function showToast(message, type) {
+	type = type || 'info';
+	var container = document.getElementById('toast-container');
+	if (!container) return;
+	var id = 'toast-' + (++toastCounter);
+	var iconMap = { success: '&#10003;', error: '&#10007;', info: '&#8505;' };
+	var toast = document.createElement('div');
+	toast.className = 'toast toast-' + type;
+	toast.id = id;
+	toast.innerHTML = '<span class="toast-icon">' + (iconMap[type] || iconMap.info) + '</span>' +
+		'<span class="toast-msg">' + message + '</span>' +
+		'<button class="toast-close" onclick="dismissToast(\'' + id + '\')" aria-label="Dismiss">&times;</button>';
+	container.appendChild(toast);
+	setTimeout(function() { dismissToast(id); }, 5000);
+}
+
+function dismissToast(id) {
+	var el = document.getElementById(id);
+	if (!el) return;
+	el.classList.add('toast-fade-out');
+	setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+}
+
+// --- Relative timestamps ---
+function relativeTime(dateStr) {
+	if (!dateStr) return '';
+	var now = Date.now();
+	var then = new Date(dateStr).getTime();
+	if (isNaN(then)) return dateStr;
+	var diff = Math.floor((now - then) / 1000);
+	if (diff < 0) return 'just now';
+	if (diff < 60) return diff + 's ago';
+	if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+	if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+	return Math.floor(diff / 86400) + 'd ago';
+}
+
+function relativeTimeUpdate() {
+	var els = document.querySelectorAll('[data-timestamp]');
+	for (var i = 0; i < els.length; i++) {
+		var ts = els[i].getAttribute('data-timestamp');
+		els[i].textContent = relativeTime(ts);
+		els[i].title = ts;
+	}
+}
+
+setInterval(relativeTimeUpdate, 30000);
+
+// --- Copy to clipboard ---
+function copyToClipboard(text, triggerEl) {
+	if (navigator.clipboard && navigator.clipboard.writeText) {
+		navigator.clipboard.writeText(text).then(function() {
+			showCopyFeedback(triggerEl);
+		});
+	} else {
+		var ta = document.createElement('textarea');
+		ta.value = text;
+		ta.style.position = 'fixed';
+		ta.style.left = '-9999px';
+		document.body.appendChild(ta);
+		ta.select();
+		try { document.execCommand('copy'); showCopyFeedback(triggerEl); } catch(e) {}
+		document.body.removeChild(ta);
+	}
+}
+
+function showCopyFeedback(el) {
+	if (!el) return;
+	var tip = document.createElement('span');
+	tip.className = 'copy-tooltip';
+	tip.textContent = 'Copied!';
+	el.appendChild(tip);
+	showToast('Copied to clipboard', 'success');
+	setTimeout(function() { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 1000);
+}
+
+function makeCopyable(container, selector, getText) {
+	var els = container.querySelectorAll(selector);
+	for (var i = 0; i < els.length; i++) {
+		(function(el) {
+			if (el.getAttribute('data-copyable')) return;
+			el.setAttribute('data-copyable', '1');
+			el.classList.add('copyable');
+			var icon = document.createElement('span');
+			icon.className = 'copy-icon';
+			icon.innerHTML = '&#128203;';
+			el.appendChild(icon);
+			el.addEventListener('click', function(e) {
+				e.stopPropagation();
+				copyToClipboard(getText ? getText(el) : el.textContent.trim(), el);
+			});
+		})(els[i]);
+	}
+}
+
+// --- Connection status indicator ---
+function updateConnectionStatus(state) {
+	var dot = document.getElementById('connection-dot');
+	var label = document.getElementById('connection-label');
+	if (!dot || !label) return;
+	dot.className = 'connection-dot ' + state;
+	var labels = { connected: 'Connected', connecting: 'Connecting...', disconnected: 'Disconnected' };
+	label.textContent = labels[state] || 'Unknown';
+}
+
+// --- Loading skeletons ---
+function renderSkeletons(container, count) {
+	count = count || 3;
+	var html = '';
+	for (var i = 0; i < count; i++) {
+		html += '<div class="skeleton-item">' +
+			'<div class="skeleton-line skeleton-line-short"></div>' +
+			'<div class="skeleton-line"></div>' +
+			'<div class="skeleton-line skeleton-line-badge"></div>' +
+			'</div>';
+	}
+	container.innerHTML = html;
+}
+
+// --- Empty states ---
+function renderEmptyState(container, title, hint) {
+	container.innerHTML = '<div class="empty-state">' +
+		'<div class="empty-state-icon"><svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="#607D8B" stroke-width="2" stroke-dasharray="4 4"/><path d="M18 22h12M18 28h8" stroke="#607D8B" stroke-width="2" stroke-linecap="round"/></svg></div>' +
+		'<div class="empty-state-title">' + title + '</div>' +
+		'<div class="empty-state-hint">' + hint + '</div>' +
+		'</div>';
+}
+
+// --- Sparkline charts ---
+function renderSparkline(values, width, height) {
+	width = width || 80;
+	height = height || 20;
+	if (!values || values.length < 2) return '';
+	var max = Math.max.apply(null, values);
+	var min = Math.min.apply(null, values);
+	var range = max - min || 1;
+	var step = width / (values.length - 1);
+	var points = [];
+	for (var i = 0; i < values.length; i++) {
+		var x = Math.round(i * step);
+		var y = Math.round(height - ((values[i] - min) / range) * (height - 2) - 1);
+		points.push(x + ',' + y);
+	}
+	return '<span class="sparkline-container">' +
+		'<svg class="sparkline-svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '">' +
+		'<polyline points="' + points.join(' ') + '" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+		'</svg></span>';
+}
+
+// --- Keyboard shortcuts ---
+var kbdSelectedIndex = -1;
+
+function openKbdHelp() {
+	var modal = document.getElementById('kbd-help-modal');
+	if (modal) modal.classList.remove('hidden');
+}
+
+function closeKbdHelp() {
+	var modal = document.getElementById('kbd-help-modal');
+	if (modal) modal.classList.add('hidden');
+}
+
+document.addEventListener('keydown', function(e) {
+	var tag = (e.target.tagName || '').toLowerCase();
+	if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+		if (e.key === 'Escape') { e.target.blur(); }
+		return;
+	}
+	var modal = document.getElementById('kbd-help-modal');
+	if (modal && !modal.classList.contains('hidden')) {
+		if (e.key === 'Escape' || e.key === '?') { closeKbdHelp(); e.preventDefault(); }
+		return;
+	}
+	var items, listEl;
+	if (e.key === 'j' || e.key === 'k') {
+		listEl = document.getElementById(activePanel === 'jobs' ? 'job-list' : 'chain-list');
+		if (!listEl) return;
+		items = listEl.querySelectorAll('.list-item');
+		if (items.length === 0) return;
+		if (e.key === 'j') kbdSelectedIndex = Math.min(kbdSelectedIndex + 1, items.length - 1);
+		else kbdSelectedIndex = Math.max(kbdSelectedIndex - 1, 0);
+		for (var i = 0; i < items.length; i++) items[i].classList.remove('kbd-selected');
+		items[kbdSelectedIndex].classList.add('kbd-selected');
+		items[kbdSelectedIndex].scrollIntoView({ block: 'nearest' });
+		e.preventDefault();
+	} else if (e.key === 'Enter') {
+		listEl = document.getElementById(activePanel === 'jobs' ? 'job-list' : 'chain-list');
+		if (!listEl) return;
+		items = listEl.querySelectorAll('.list-item');
+		if (kbdSelectedIndex >= 0 && kbdSelectedIndex < items.length) {
+			items[kbdSelectedIndex].click();
+		}
+		e.preventDefault();
+	} else if (e.key === 'Escape') {
+		kbdSelectedIndex = -1;
+		var allItems = document.querySelectorAll('.list-item');
+		for (var j = 0; j < allItems.length; j++) allItems[j].classList.remove('kbd-selected');
+	} else if (e.key === '/') {
+		var search = document.getElementById('search-input');
+		if (search) { search.focus(); e.preventDefault(); }
+	} else if (e.key === '?') {
+		openKbdHelp();
+		e.preventDefault();
+	} else if (e.key === 'r') {
+		if (typeof fetchJobs === 'function') fetchJobs();
+		if (typeof fetchChains === 'function') fetchChains();
+		showToast('Refreshed', 'info');
+		e.preventDefault();
+	}
+});
