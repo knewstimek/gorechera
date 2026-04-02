@@ -1,56 +1,51 @@
 {
-  "planner": {
-    "provider": "claude",
-    "model": "sonnet",
-    "effort": "high",
-    "tool_policy": "plan-only",
-    "fallback_provider": "codex",
-    "fallback_model": "gpt-5.4",
-    "max_budget_usd": 2
-  },
-  "leader": {
-    "provider": "claude",
-    "model": "sonnet",
-    "effort": "high",
-    "tool_policy": "orchestrate",
-    "fallback_provider": "codex",
-    "fallback_model": "gpt-5.4",
-    "max_budget_usd": 3
-  },
-  "executor": {
+  "_comment": "Provider presets for gorchera_start_job role_overrides.",
+  "_note": "director and evaluator use strong models for planning/judgment. executor and reviewer use cost-efficient models for implementation/review.",
+
+  "cross-provider (recommended)": {
+    "_description": "GPT plans, Claude executes. Best quality/cost ratio.",
     "provider": "codex",
-    "model": "gpt-5.4",
-    "effort": "medium",
-    "tool_policy": "workspace-write",
-    "fallback_provider": "claude",
-    "fallback_model": "sonnet",
-    "max_budget_usd": 5
+    "pipeline_mode": "light",
+    "role_overrides": {
+      "executor": {"provider": "claude", "model": "sonnet"},
+      "reviewer": {"provider": "claude", "model": "sonnet"}
+    }
   },
-  "reviewer": {
-    "provider": "claude",
-    "model": "sonnet",
-    "effort": "high",
-    "tool_policy": "review-only",
-    "fallback_provider": "codex",
-    "fallback_model": "gpt-5.4-mini",
-    "max_budget_usd": 2
-  },
-  "tester": {
+
+  "codex-only (GPT budget)": {
+    "_description": "All GPT. Director/evaluator use 5.4, executor/reviewer use 5.4-mini.",
     "provider": "codex",
-    "model": "gpt-5.4-mini",
-    "effort": "low",
-    "tool_policy": "test-only",
-    "fallback_provider": "claude",
-    "fallback_model": "sonnet",
-    "max_budget_usd": 1
+    "pipeline_mode": "light",
+    "role_overrides": {}
   },
-  "evaluator": {
+
+  "claude-only": {
+    "_description": "All Claude. Director/evaluator use Opus, executor/reviewer use Sonnet.",
     "provider": "claude",
-    "model": "sonnet",
-    "effort": "medium",
-    "tool_policy": "read-only",
-    "fallback_provider": "codex",
-    "fallback_model": "gpt-5.4-mini",
-    "max_budget_usd": 1
+    "pipeline_mode": "light",
+    "role_overrides": {}
+  },
+
+  "balanced cross-provider": {
+    "_description": "Like cross-provider but with reviewer enabled.",
+    "provider": "codex",
+    "pipeline_mode": "balanced",
+    "role_overrides": {
+      "executor": {"provider": "claude", "model": "sonnet"},
+      "reviewer": {"provider": "claude", "model": "sonnet"}
+    }
+  },
+
+  "full strict": {
+    "_description": "Maximum quality. GPT 5.4 for all roles, full pipeline with fix loops.",
+    "provider": "codex",
+    "pipeline_mode": "full",
+    "strictness_level": "strict",
+    "role_overrides": {
+      "director": {"model": "opus"},
+      "executor": {"provider": "claude", "model": "sonnet"},
+      "reviewer": {"provider": "claude", "model": "sonnet"},
+      "evaluator": {"model": "opus"}
+    }
   }
 }
