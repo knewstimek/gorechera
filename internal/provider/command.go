@@ -4,10 +4,39 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
 )
+
+// providerEnv returns a minimal environment for provider subprocess calls.
+// It includes OS essentials needed to locate the provider binary and run it,
+// plus API keys required by each provider. All other env vars (e.g. secrets
+// from the parent shell that are not provider keys) are excluded.
+func providerEnv(extra ...string) []string {
+	// OS essentials: PATH to find the binary, TEMP/HOME for runtime state.
+	safe := []string{
+		"PATH", "SYSTEMROOT", "HOME", "TEMP", "TMP",
+		"LOCALAPPDATA", "APPDATA", "USERPROFILE",
+		"COMSPEC", "PATHEXT",
+		// Provider API keys -- explicitly included so CLI tools can authenticate.
+		"ANTHROPIC_API_KEY",
+		"OPENAI_API_KEY",
+		"OPENAI_BASE_URL",
+		// Codex/OpenAI org routing
+		"OPENAI_ORG_ID",
+		"ANTHROPIC_BASE_URL",
+	}
+	env := make([]string, 0, len(safe)+len(extra))
+	for _, key := range safe {
+		if val, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+val)
+		}
+	}
+	env = append(env, extra...)
+	return env
+}
 
 type CommandResult struct {
 	ExitCode int
@@ -61,9 +90,9 @@ func runExecutableWithStdin(ctx context.Context, executable string, timeout time
 	if strings.TrimSpace(dir) != "" {
 		cmd.Dir = dir
 	}
-	if len(env) > 0 {
-		cmd.Env = append(cmd.Environ(), env...)
-	}
+	// Use providerEnv (allowlist-based) instead of cmd.Environ() to avoid
+	// leaking arbitrary parent-process secrets to the provider subprocess.
+	cmd.Env = providerEnv(env...)
 	cmd.Stdin = strings.NewReader(stdinData)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -101,9 +130,9 @@ func runExecutable(ctx context.Context, executable string, timeout time.Duration
 	if strings.TrimSpace(dir) != "" {
 		cmd.Dir = dir
 	}
-	if len(env) > 0 {
-		cmd.Env = append(cmd.Environ(), env...)
-	}
+	// Use providerEnv (allowlist-based) instead of cmd.Environ() to avoid
+	// leaking arbitrary parent-process secrets to the provider subprocess.
+	cmd.Env = providerEnv(env...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout

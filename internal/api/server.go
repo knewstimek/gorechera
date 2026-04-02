@@ -372,7 +372,12 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request, jobID stri
 			flusher.Flush()
 		}
 
-		if job.Status == domain.JobStatusDone || job.Status == domain.JobStatusFailed {
+		// Blocked is also terminal for streaming: the job will not make further
+		// progress without operator intervention, so holding the connection open
+		// would result in indefinite polling.
+		if job.Status == domain.JobStatusDone ||
+			job.Status == domain.JobStatusFailed ||
+			job.Status == domain.JobStatusBlocked {
 			return
 		}
 

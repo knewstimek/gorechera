@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,8 +46,8 @@ func TestSafeReadFileBlocksTraversal(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error for path outside root, got nil")
 		}
-		if !strings.Contains(err.Error(), "outside allowed root") {
-			t.Errorf("expected 'outside allowed root' in error, got: %v", err)
+		if !errors.Is(err, errPathTraversal) {
+			t.Errorf("expected errPathTraversal sentinel, got: %v", err)
 		}
 	})
 
@@ -106,8 +107,12 @@ func TestBuildEvaluatorViewBlocksTraversal(t *testing.T) {
 		if view.Error == "" {
 			t.Fatal("expected error for path outside workspace, got empty error")
 		}
-		if !strings.Contains(view.Error, "outside allowed root") {
-			t.Errorf("expected 'outside allowed root' in error, got: %q", view.Error)
+		// Client-facing message must NOT reveal filesystem paths -- only a generic message.
+		if strings.Contains(view.Error, workspaceDir) || strings.Contains(view.Error, outsideFile) {
+			t.Errorf("client error must not contain filesystem paths, got: %q", view.Error)
+		}
+		if view.Error != "file not found" {
+			t.Errorf("expected generic 'file not found' error, got: %q", view.Error)
 		}
 	})
 

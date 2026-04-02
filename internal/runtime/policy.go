@@ -18,7 +18,9 @@ func NewDefaultPolicy() *Policy {
 			CategoryTest:    newRuleSet("go", "cargo", "dotnet", "pytest", "npm", "pnpm", "yarn", "python"),
 			CategoryLint:    newRuleSet("go", "golangci-lint", "eslint", "prettier", "ruff", "black", "mypy", "flake8", "cargo", "dotnet"),
 			CategorySearch:  newRuleSet("rg", "grep", "git", "findstr", "select-string"),
-			CategoryCommand: newRuleSet("go", "rg"),
+			// rg is intentionally absent from CategoryCommand: it can traverse the
+			// full filesystem without a workspace boundary. Use CategorySearch instead.
+			CategoryCommand: newRuleSet("go"),
 		},
 	}
 }

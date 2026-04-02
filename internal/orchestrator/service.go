@@ -2284,7 +2284,12 @@ func collectWorkspaceDiffSummary(ctx context.Context, workspaceDir string) strin
 		return ""
 	}
 
-	cmd := exec.CommandContext(ctx, "git", "-C", workspaceDir, "diff", "--stat")
+	// Cap git diff --stat at 10 seconds so large worktrees cannot stall the
+	// orchestrator core loop while it collects the diff summary.
+	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(timeoutCtx, "git", "-C", workspaceDir, "diff", "--stat")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {

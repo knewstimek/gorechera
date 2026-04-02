@@ -7,11 +7,27 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"gorchera/internal/domain"
 )
+
+// leaseValidIDRegexp mirrors store.validIDRegexp to prevent path traversal via jobID.
+// Allows only characters that are safe as a file-system path component.
+var leaseValidIDRegexp = regexp.MustCompile(`^[a-zA-Z0-9_\-.]+$`)
+
+// validateLeaseID returns an error if jobID could cause path traversal.
+func validateLeaseID(id string) error {
+	if id == "." || id == ".." {
+		return fmt.Errorf("invalid job ID %q: reserved filesystem path component", id)
+	}
+	if !leaseValidIDRegexp.MatchString(id) {
+		return fmt.Errorf("invalid job ID %q: must match ^[a-zA-Z0-9_-.]+$", id)
+	}
+	return nil
+}
 
 const (
 	jobLeaseHeartbeatInterval = 15 * time.Second
@@ -74,6 +90,10 @@ func (s *Service) startJobLease(job *domain.Job) func() {
 }
 
 func (s *Service) writeLease(jobID, workspaceDir string, heartbeatAt time.Time) error {
+	// Validate before using jobID as a path component to prevent traversal.
+	if err := validateLeaseID(jobID); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(s.leaseDir(), 0o755); err != nil {
 		return err
 	}
@@ -96,6 +116,12 @@ func (s *Service) clearJobRuntimeState(job *domain.Job) {
 	}
 	job.RunOwnerID = ""
 	job.RunHeartbeatAt = time.Time{}
+	// validateLeaseID before Remove to stay consistent; invalid IDs are simply
+	// ignored since there is no lease file to clean up.
+	if err := validateLeaseID(job.ID); err != nil {
+		log.Printf("[gorchera] lease: skipping remove for invalid job ID %q: %v", job.ID, err)
+		return
+	}
 	if err := os.Remove(s.leasePath(job.ID)); err != nil && !os.IsNotExist(err) {
 		log.Printf("[gorchera] lease: failed to remove lease for job %s: %v", job.ID, err)
 	}
@@ -163,6 +189,10 @@ func (s *Service) isStaleJob(job domain.Job, now time.Time) bool {
 }
 
 func (s *Service) readLease(jobID string) (jobLease, error) {
+	// Validate before using jobID as a path component to prevent traversal.
+	if err := validateLeaseID(jobID); err != nil {
+		return jobLease{}, err
+	}
 	data, err := os.ReadFile(s.leasePath(jobID))
 	if err != nil {
 		return jobLease{}, err

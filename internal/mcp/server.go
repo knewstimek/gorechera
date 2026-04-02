@@ -32,6 +32,10 @@ type Server struct {
 	writer       io.Writer
 	pendingLines [][]byte
 
+	// done is closed by Run() when the stdin loop exits, signalling listenEvents
+	// to stop so the goroutine does not leak after the server shuts down.
+	done chan struct{}
+
 	terminalMu   sync.Mutex
 	lastTerminal map[string]string
 }
@@ -48,6 +52,7 @@ var (
 func NewServer(service *orchestrator.Service) *Server {
 	return &Server{
 		service:      service,
+		done:         make(chan struct{}),
 		lastTerminal: make(map[string]string),
 	}
 }
@@ -105,9 +110,20 @@ func (s *Server) sendNotification(method string, params any) {
 // listenEvents reads from the service event channel and forwards each event
 // as an MCP notifications/message notification to the connected client.
 // It runs in its own goroutine for the lifetime of Run().
+// When Run() exits it closes s.done, causing this goroutine to exit cleanly
+// instead of leaking on a channel that is never closed.
 func (s *Server) listenEvents() {
-	for event := range s.service.EventChan() {
-		s.handleEventNotification(event)
+	for {
+		select {
+		case <-s.done:
+			return
+		case event, ok := <-s.service.EventChan():
+			if !ok {
+				// Channel closed by the service itself -- nothing more to relay.
+				return
+			}
+			s.handleEventNotification(event)
+		}
 	}
 }
 
@@ -117,6 +133,8 @@ func (s *Server) Run() error {
 	// Start notification relay before processing any requests so that events
 	// emitted by background jobs started earlier are not missed.
 	go s.listenEvents()
+	// Signal listenEvents to exit when Run() returns, preventing goroutine leak.
+	defer close(s.done)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
@@ -1178,6 +1196,14 @@ func (s *Server) toolDiff(ctx context.Context, args map[string]any) (toolResult,
 
 	argsv := []string{"diff", "HEAD"}
 	if pathspec := strings.TrimSpace(stringArg(args, "pathspec")); pathspec != "" {
+		// Reject path traversal and git pathspec magic prefixes.
+		// Only simple relative paths are accepted (no ".." segments, no ":" magic).
+		if strings.Contains(pathspec, "..") {
+			return toolResult{}, fmt.Errorf("pathspec must not contain '..': %q", pathspec)
+		}
+		if strings.HasPrefix(pathspec, ":") {
+			return toolResult{}, fmt.Errorf("pathspec must not start with ':' (git magic prefix): %q", pathspec)
+		}
 		argsv = append(argsv, "--", pathspec)
 	}
 	output, err := gitCommandOutput(ctx, workspaceDir, argsv...)
@@ -1321,7 +1347,12 @@ func jsonResult(v any) (toolResult, error) {
 }
 
 func gitCommandOutput(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+	// Apply a hard 10-second timeout so that large worktrees cannot cause
+	// git diff to hang indefinitely inside the MCP request handler.
+	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(timeoutCtx, "git", append([]string{"-C", dir}, args...)...)
 	cmd.Env = append(os.Environ(),
 		"GIT_CONFIG_GLOBAL="+os.DevNull,
 		"HOME="+dir,
@@ -1329,6 +1360,9 @@ func gitCommandOutput(ctx context.Context, dir string, args ...string) (string, 
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		if timeoutCtx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("git %s timed out after 10s", strings.Join(args, " "))
+		}
 		return "", fmt.Errorf("git %s failed: %s", strings.Join(args, " "), strings.TrimSpace(string(output)))
 	}
 	return string(output), nil

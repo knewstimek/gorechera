@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -134,7 +135,9 @@ func BuildEvaluatorView(job *domain.Job) EvaluatorView {
 
 	data, err := safeReadFile(jobArtifactsRoot(job), job.EvaluatorReportRef)
 	if err != nil {
-		view.Error = err.Error()
+		// Log server-side with details; expose only a generic message to the client.
+		log.Printf("BuildEvaluatorView job=%s: reading report %q: %v", job.ID, job.EvaluatorReportRef, err)
+		view.Error = "file not found"
 		return view
 	}
 	var report domain.EvaluatorReport
@@ -284,22 +287,29 @@ func dedupeStrings(values []string) []string {
 	return out
 }
 
+// errPathTraversal is a sentinel returned by safeReadFile when the requested
+// path resolves outside the allowed root. It carries no filesystem details so
+// it is safe to propagate to callers that format their own client-facing messages.
+var errPathTraversal = fmt.Errorf("path is outside allowed root")
+
 // safeReadFile reads path only if it is within allowedRoot, preventing path traversal.
 // Both allowedRoot and path are resolved to absolute paths before comparison.
+// On traversal the sentinel errPathTraversal is returned (no path details).
+// Callers are responsible for server-side logging and choosing a client-safe message.
 func safeReadFile(allowedRoot, path string) ([]byte, error) {
 	absRoot, err := filepath.Abs(allowedRoot)
 	if err != nil {
-		return nil, fmt.Errorf("resolving root %q: %w", allowedRoot, err)
+		return nil, errPathTraversal
 	}
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return nil, fmt.Errorf("resolving path %q: %w", path, err)
+		return nil, errPathTraversal
 	}
 	cleanRoot := filepath.Clean(absRoot)
 	cleanPath := filepath.Clean(absPath)
 	// Accept the root itself or any path strictly under root (with separator boundary).
 	if cleanPath != cleanRoot && !strings.HasPrefix(cleanPath, cleanRoot+string(filepath.Separator)) {
-		return nil, fmt.Errorf("path %q is outside allowed root %q", path, allowedRoot)
+		return nil, errPathTraversal
 	}
 	return os.ReadFile(cleanPath)
 }
@@ -322,7 +332,10 @@ func loadArtifactView(root, path string) ArtifactView {
 
 	data, err := safeReadFile(root, path)
 	if err != nil {
-		view.Error = err.Error()
+		// Log full detail server-side; send a generic message to the client so
+		// internal filesystem paths are never exposed in API responses.
+		log.Printf("safeReadFile root=%q path=%q: %v", root, path, err)
+		view.Error = "file not found"
 		return view
 	}
 
