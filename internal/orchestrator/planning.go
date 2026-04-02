@@ -81,7 +81,7 @@ func (s *Service) runPlannerPhase(ctx context.Context, job *domain.Job) (domain.
 	if err != nil {
 		return domain.PlanningArtifact{}, err
 	}
-	s.accumulateTokenUsage(job, phaseJob.CurrentStep, estimateProviderUsage(raw, phaseJob))
+	s.accumulateTokenUsage(job, phaseJob.CurrentStep, estimateProviderUsage(phaseJob, domain.RolePlanner, raw, phaseJob))
 	var out domain.PlanningArtifact
 	if err := json.Unmarshal([]byte(raw), &out); err != nil {
 		return domain.PlanningArtifact{}, err

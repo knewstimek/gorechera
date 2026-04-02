@@ -345,7 +345,7 @@ func (s *Service) executeParallelWorkerPlan(ctx context.Context, job domain.Job,
 	if err != nil {
 		return parallelWorkerResult{Plan: plan, Err: fmt.Errorf("worker execution failed: %w", err)}
 	}
-	usage := estimateProviderUsage(rawWorker, job, task)
+	usage := estimateProviderUsage(job, domain.RoleForTaskType(task.TaskType), rawWorker, job, task)
 
 	var worker domain.WorkerOutput
 	if err := json.Unmarshal([]byte(rawWorker), &worker); err != nil {

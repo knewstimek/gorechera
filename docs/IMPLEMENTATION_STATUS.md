@@ -41,7 +41,11 @@ go test ./...    # PASS
   - `cmd/mcp-smoke` runs isolated end-to-end MCP scenarios against a real `gorchera mcp` subprocess.
   - `basic` validates `initialize -> tools/list -> start_job -> status(wait=true)` using the mock provider.
   - `recovery` seeds recoverable jobs under an isolated `.gorchera` root, restarts `mcp`, and verifies startup recovery completes only the explicitly requested jobs without touching the main workspace state.
-- Rough token/cost accounting using serialized input/output heuristics.
+- Model-aware token/cost accounting:
+  - token counts remain heuristic (`~4 chars/token`)
+  - estimated cost now uses provider/model-specific input/output pricing instead of a single flat per-token constant
+  - Claude aliases (`opus` / `sonnet` / `haiku`) map to current Anthropic pricing tiers
+  - Codex aliases map to current GPT-5 pricing tiers for estimation
 
 ### Provider integration
 
@@ -216,5 +220,5 @@ All 10 HIGH severity findings from `docs/AUDIT_REPORT.md` have been fixed. `go b
 
 - The workspace is already dirty outside this docs task. Pre-existing Go file modifications are present in the repository, so verification must distinguish this task's docs-only edits from unrelated local changes.
 - Provider fallback is provider-aware but not model-aware. `fallback_model` is currently configuration-only.
-- Token/cost accounting is still heuristic-only and currently underestimates real provider pricing. The incident review item to replace the flat `roughCostPerTokenUSD` with model-aware pricing is not implemented yet.
+- Token counts are still heuristic-only, so totals remain approximate even though pricing is now model-aware.
 - The prompt contract still tells workers to use shell commands for file creation, but repository editing policy for this project is enforced outside the runtime prompt by the orchestrator workflow and code review, not by a separate worker sandbox contract inside Go code.

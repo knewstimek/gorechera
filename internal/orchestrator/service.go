@@ -28,7 +28,6 @@ var ErrHarnessOwnershipMismatch = errors.New("harness process not owned by job")
 const (
 	providerRetryLimit     = 3
 	providerRetryBaseDelay = 250 * time.Millisecond
-	roughCostPerTokenUSD   = 0.000001
 	recoveryConcurrency    = 2
 )
 
@@ -974,7 +973,7 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, er
 			}
 			return s.failJob(ctx, job, fmt.Sprintf("leader execution failed: %v", err))
 		}
-		s.accumulateTokenUsage(job, job.CurrentStep, estimateProviderUsage(rawLeader, *job))
+		s.accumulateTokenUsage(job, job.CurrentStep, estimateProviderUsage(*job, domain.RoleLeader, rawLeader, *job))
 		job.SupervisorDirective = ""
 
 		var leader domain.LeaderOutput
@@ -1145,7 +1144,7 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 		_, failErr := s.failJob(ctx, job, last.ErrorReason)
 		return failErr
 	}
-	s.accumulateTokenUsage(job, step.Index, estimateProviderUsage(rawWorker, *job, task))
+	s.accumulateTokenUsage(job, step.Index, estimateProviderUsage(*job, domain.RoleForTaskType(task.TaskType), rawWorker, *job, task))
 
 	var worker domain.WorkerOutput
 	if err := json.Unmarshal([]byte(rawWorker), &worker); err != nil {
@@ -1377,22 +1376,6 @@ func (s *Service) executeProviderPhase(ctx context.Context, job *domain.Job, pha
 		}
 		return "", action, err
 	}
-}
-
-func estimateTokens(input, output string) domain.TokenUsage {
-	inputTokens := estimateTokenCount(input)
-	outputTokens := estimateTokenCount(output)
-	totalTokens := inputTokens + outputTokens
-	return domain.TokenUsage{
-		InputTokens:      inputTokens,
-		OutputTokens:     outputTokens,
-		TotalTokens:      totalTokens,
-		EstimatedCostUSD: float64(totalTokens) * roughCostPerTokenUSD,
-	}
-}
-
-func estimateProviderUsage(output string, inputs ...any) domain.TokenUsage {
-	return estimateTokens(buildTokenUsageInput(inputs...), output)
 }
 
 func buildTokenUsageInput(inputs ...any) string {

@@ -41,6 +41,10 @@ internal/
     artifact_store.go            -- Atomic artifact materialization
 ```
 
+Notes:
+- Token counts are estimated heuristically from serialized prompt/response size.
+- Estimated cost is model-aware: the orchestrator prices input and output tokens separately using provider/model pricing tables, while still excluding caching, batch discounts, and tool-specific surcharges.
+
 ## State Model
 
 ```text
