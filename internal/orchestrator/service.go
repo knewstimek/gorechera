@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -110,6 +111,35 @@ func NewService(sessions *provider.SessionManager, state *store.StateStore, arti
 // goroutines to stop. It is safe to call multiple times.
 func (s *Service) Shutdown() {
 	s.shutdownCancel()
+}
+
+// RecoverJobs resumes any jobs that were in a non-terminal state when the
+// server last stopped. Without this, jobs created just before an MCP restart
+// would be stuck in "starting" or "waiting_*" forever because the goroutine
+// that drives runLoop was lost. Call this once after NewService.
+func (s *Service) RecoverJobs() {
+	ctx := context.Background()
+	jobs, err := s.state.ListJobs(ctx)
+	if err != nil {
+		log.Printf("[gorchera] recovery: failed to list jobs: %v", err)
+		return
+	}
+	recovered := 0
+	for i := range jobs {
+		job := &jobs[i]
+		switch job.Status {
+		case domain.JobStatusStarting, domain.JobStatusRunning,
+			domain.JobStatusWaitingLeader, domain.JobStatusWaitingWorker:
+			log.Printf("[gorchera] recovery: resuming job %s (status=%s)", job.ID, job.Status)
+			go func(j *domain.Job) {
+				s.runLoop(s.shutdownCtx, j) //nolint:errcheck
+			}(job)
+			recovered++
+		}
+	}
+	if recovered > 0 {
+		log.Printf("[gorchera] recovery: resumed %d jobs", recovered)
+	}
 }
 
 // EventChan returns a read-only channel that receives a notification each time

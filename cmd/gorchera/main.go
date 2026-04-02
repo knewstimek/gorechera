@@ -43,6 +43,7 @@ func main() {
 
 	sessionManager := provider.NewSessionManager(registry)
 	service := orchestrator.NewService(sessionManager, stateStore, artifactStore, workspaceRoot)
+	service.RecoverJobs()
 
 	ctx := context.Background()
 
