@@ -1,10 +1,12 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -54,7 +56,8 @@ func authMiddleware(token string, next http.Handler) http.Handler {
 			return
 		}
 		auth := r.Header.Get("Authorization")
-		if auth != "Bearer "+token {
+		// Use constant-time comparison to prevent timing attacks on the token.
+		if subtle.ConstantTimeCompare([]byte(auth), []byte("Bearer "+token)) != 1 {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -71,14 +74,16 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		jobs, err := s.orchestrator.List(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("list jobs: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, jobs)
 	case http.MethodPost:
 		var req StartJobRequest
 		if err := decodeJSONBody(r, &req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.Printf("decode start job request: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
 		job, err := s.orchestrator.Start(r.Context(), orchestrator.CreateJobInput{
@@ -93,7 +98,8 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 			MaxSteps:      req.MaxSteps,
 		})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("start job: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusCreated, job)
@@ -117,7 +123,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Get(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			log.Printf("get job %s: %v", jobID, err)
+			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 		writeJSON(w, http.StatusOK, job)
@@ -132,7 +139,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Resume(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("resume job %s: %v", jobID, err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, job)
@@ -147,7 +155,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Approve(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("approve job %s: %v", jobID, err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, job)
@@ -159,7 +168,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Retry(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("retry job %s: %v", jobID, err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, job)
@@ -173,19 +183,22 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
 			body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				log.Printf("read reject body: %v", err)
+				http.Error(w, "bad request", http.StatusBadRequest)
 				return
 			}
 			if len(strings.TrimSpace(string(body))) > 0 {
 				if err := json.Unmarshal(body, &req); err != nil {
-					http.Error(w, err.Error(), http.StatusBadRequest)
+					log.Printf("decode reject request: %v", err)
+					http.Error(w, "bad request", http.StatusBadRequest)
 					return
 				}
 			}
 		}
 		job, err := s.orchestrator.Reject(r.Context(), jobID, req.Reason)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("reject job %s: %v", jobID, err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, job)
@@ -199,19 +212,22 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
 			body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				log.Printf("read cancel body: %v", err)
+				http.Error(w, "bad request", http.StatusBadRequest)
 				return
 			}
 			if len(strings.TrimSpace(string(body))) > 0 {
 				if err := json.Unmarshal(body, &req); err != nil {
-					http.Error(w, err.Error(), http.StatusBadRequest)
+					log.Printf("decode cancel request: %v", err)
+					http.Error(w, "bad request", http.StatusBadRequest)
 					return
 				}
 			}
 		}
 		job, err := s.orchestrator.Cancel(r.Context(), jobID, req.Reason)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("cancel job %s: %v", jobID, err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, job)
@@ -223,12 +239,14 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		var req SteerJobRequest
 		if err := decodeJSONBody(r, &req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.Printf("decode steer request: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
 		job, err := s.orchestrator.Steer(r.Context(), jobID, req.Message)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("steer job %s: %v", jobID, err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, job)
@@ -247,7 +265,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Get(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			log.Printf("get job %s events: %v", jobID, err)
+			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 		writeJSON(w, http.StatusOK, job.Events)
@@ -259,7 +278,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Get(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			log.Printf("get job %s artifacts: %v", jobID, err)
+			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 		writeJSON(w, http.StatusOK, flattenArtifacts(job))
@@ -271,7 +291,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Get(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			log.Printf("get job %s verification: %v", jobID, err)
+			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 		writeJSON(w, http.StatusOK, BuildVerificationView(job))
@@ -283,7 +304,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Get(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			log.Printf("get job %s planning: %v", jobID, err)
+			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 		writeJSON(w, http.StatusOK, BuildPlanningView(job))
@@ -295,7 +317,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Get(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			log.Printf("get job %s evaluator: %v", jobID, err)
+			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 		writeJSON(w, http.StatusOK, BuildEvaluatorView(job))
@@ -307,7 +330,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 		}
 		job, err := s.orchestrator.Get(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			log.Printf("get job %s profile: %v", jobID, err)
+			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 		writeJSON(w, http.StatusOK, BuildProfileView(job))
@@ -336,7 +360,8 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request, jobID stri
 	for {
 		job, err := s.orchestrator.Get(r.Context(), jobID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			log.Printf("stream events get job %s: %v", jobID, err)
+			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 
@@ -412,7 +437,8 @@ func (s *Server) handleChains(w http.ResponseWriter, r *http.Request) {
 	}
 	chains, err := s.orchestrator.ListChains(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("list chains: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, chains)
@@ -430,7 +456,8 @@ func (s *Server) handleChain(w http.ResponseWriter, r *http.Request) {
 	}
 	chain, err := s.orchestrator.GetChain(r.Context(), chainID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		log.Printf("get chain %s: %v", chainID, err)
+		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 	writeJSON(w, http.StatusOK, chain)

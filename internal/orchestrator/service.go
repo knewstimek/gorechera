@@ -87,6 +87,13 @@ type Service struct {
 	shutdownCtx    context.Context
 	shutdownCancel context.CancelFunc
 
+	// jobCache holds in-memory snapshots of running jobs so that Get() and
+	// List() reflect real-time progress without a disk round-trip. The runLoop
+	// goroutine is the sole writer for a given job ID; readers get a deep clone
+	// via cacheGet so no mutable pointer escapes.
+	cacheMu  sync.RWMutex
+	jobCache map[string]*domain.Job
+
 	runMu       sync.Mutex
 	runningJobs map[string]struct{}
 	bgMu        sync.Mutex
@@ -112,6 +119,7 @@ func NewService(sessions *provider.SessionManager, state *store.StateStore, arti
 		harnessOwners:   make(map[int]string),
 		jobHarnesses:    make(map[string]map[int]struct{}),
 		harnessInflight: make(map[int]string),
+		jobCache:        make(map[string]*domain.Job),
 		shutdownCtx:     shutdownCtx,
 		shutdownCancel:  shutdownCancel,
 		runningJobs:     make(map[string]struct{}),
@@ -229,7 +237,7 @@ func (s *Service) recoverJobs(jobIDs []string) {
 			}
 		}
 		switch job.Status {
-		case domain.JobStatusStarting, domain.JobStatusRunning,
+		case domain.JobStatusStarting, domain.JobStatusPlanning, domain.JobStatusRunning,
 			domain.JobStatusWaitingLeader, domain.JobStatusWaitingWorker:
 			recoverable = append(recoverable, job)
 		}
@@ -295,6 +303,9 @@ func (s *Service) releaseJobRun(jobID string) {
 func (s *Service) latestJobSnapshot(job *domain.Job) *domain.Job {
 	if job == nil || strings.TrimSpace(job.ID) == "" {
 		return job
+	}
+	if cached := s.cacheGet(job.ID); cached != nil {
+		return cached
 	}
 	latest, err := s.state.LoadJob(context.Background(), job.ID)
 	if err != nil {
@@ -552,6 +563,9 @@ func (s *Service) Cancel(ctx context.Context, jobID, reason string) (*domain.Job
 	if err := s.state.SaveJob(ctx, job); err != nil {
 		return nil, err
 	}
+	// Update cache with blocked state rather than removing -- the runLoop
+	// goroutine may still be running and its defer will handle final eviction.
+	s.cacheUpdate(job)
 	if err := s.handleChainTerminalState(ctx, job); err != nil {
 		return nil, err
 	}
@@ -646,6 +660,11 @@ func (s *Service) Reject(ctx context.Context, jobID, reason string) (*domain.Job
 }
 
 func (s *Service) Get(ctx context.Context, jobID string) (*domain.Job, error) {
+	// Prefer the in-memory cache for running jobs -- it reflects real-time
+	// progress that has not yet been flushed to disk.
+	if cached := s.cacheGet(jobID); cached != nil {
+		return cached, nil
+	}
 	return s.state.LoadJob(ctx, jobID)
 }
 
@@ -889,7 +908,34 @@ func (s *Service) ListJobHarnessProcesses(ctx context.Context, jobID string) ([]
 }
 
 func (s *Service) List(ctx context.Context) ([]domain.Job, error) {
-	return s.state.ListJobs(ctx)
+	diskJobs, err := s.state.ListJobs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Overlay cached (in-flight) snapshots on top of the disk list so callers
+	// see real-time status for running jobs.
+	s.cacheMu.RLock()
+	if len(s.jobCache) == 0 {
+		s.cacheMu.RUnlock()
+		return diskJobs, nil
+	}
+	overlay := make(map[string]*domain.Job, len(s.jobCache))
+	for k, v := range s.jobCache {
+		overlay[k] = v
+	}
+	s.cacheMu.RUnlock()
+
+	for i, dj := range diskJobs {
+		if cached, ok := overlay[dj.ID]; ok {
+			diskJobs[i] = *domain.CloneJob(cached)
+			delete(overlay, dj.ID)
+		}
+	}
+	// Append any cached jobs that were not on disk yet (unlikely but safe).
+	for _, cached := range overlay {
+		diskJobs = append(diskJobs, *domain.CloneJob(cached))
+	}
+	return diskJobs, nil
 }
 
 func (s *Service) ListChains(ctx context.Context) ([]*domain.JobChain, error) {
@@ -1065,9 +1111,18 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (result *domain.
 			}
 		}
 		s.finalizeJobLease(job)
+		// Terminal jobs are fully persisted to disk; remove from cache so
+		// subsequent Get() reads from the authoritative disk copy.
+		if !isRecoverableJobStatus(job.Status) {
+			s.cacheRemove(job.ID)
+		}
 	}()
 
 	if len(job.PlanningArtifacts) == 0 || strings.TrimSpace(job.SprintContractRef) == "" {
+		// Surface the "planning" phase to status API so supervisors see progress
+		// instead of a stale "starting" that looks stuck.
+		job.Status = domain.JobStatusPlanning
+		s.cacheUpdate(job)
 		if err := s.ensurePlanning(ctx, job); err != nil {
 			return nil, err
 		}
@@ -1564,6 +1619,7 @@ func (s *Service) accumulateTokenUsage(job *domain.Job, stepIndex int, usage dom
 	if step := stepByIndex(job, stepIndex); step != nil {
 		step.TokenUsage = mergeTokenUsage(step.TokenUsage, usage)
 	}
+	s.cacheUpdate(job)
 }
 
 func mergeTokenUsage(current, delta domain.TokenUsage) domain.TokenUsage {
@@ -1582,7 +1638,7 @@ func (s *Service) Steer(ctx context.Context, jobID string, message string) (*dom
 		return nil, err
 	}
 	switch job.Status {
-	case domain.JobStatusRunning, domain.JobStatusWaitingLeader, domain.JobStatusWaitingWorker:
+	case domain.JobStatusPlanning, domain.JobStatusRunning, domain.JobStatusWaitingLeader, domain.JobStatusWaitingWorker:
 	default:
 		return job, fmt.Errorf("cannot steer job with status %s", job.Status)
 	}
@@ -1745,12 +1801,48 @@ func isJSONUnmarshalError(err error) bool {
 	return errors.As(err, &syntaxErr) || errors.As(err, &typeErr)
 }
 
+// cacheGet returns a deep clone of the cached job, or nil if not cached.
+// Callers get an independent copy so they cannot corrupt the cache.
+func (s *Service) cacheGet(jobID string) *domain.Job {
+	s.cacheMu.RLock()
+	cached, ok := s.jobCache[jobID]
+	s.cacheMu.RUnlock()
+	if !ok {
+		return nil
+	}
+	return domain.CloneJob(cached)
+}
+
+// cacheUpdate stores a deep clone of the job into the in-memory cache.
+// The cache owns its own copy so mutations to the caller's pointer do not
+// silently alter the cached state.
+func (s *Service) cacheUpdate(job *domain.Job) {
+	if job == nil || strings.TrimSpace(job.ID) == "" {
+		return
+	}
+	clone := domain.CloneJob(job)
+	s.cacheMu.Lock()
+	s.jobCache[job.ID] = clone
+	s.cacheMu.Unlock()
+}
+
+// cacheRemove deletes a job from the in-memory cache. Called when the job
+// reaches a terminal state and has been persisted to disk.
+func (s *Service) cacheRemove(jobID string) {
+	s.cacheMu.Lock()
+	delete(s.jobCache, jobID)
+	s.cacheMu.Unlock()
+}
+
 func (s *Service) addEvent(job *domain.Job, kind, message string) {
 	job.Events = append(job.Events, domain.Event{
 		Time:    time.Now().UTC(),
 		Kind:    kind,
 		Message: message,
 	})
+	// Keep the in-memory cache up to date so status API reflects progress
+	// immediately, even before the next disk checkpoint.
+	s.cacheUpdate(job)
 	// Non-blocking send: if the buffer is full the notification is dropped
 	// rather than stalling the orchestrator. Listeners that need guaranteed
 	// delivery should poll via Get/List instead.
@@ -1845,10 +1937,12 @@ func (s *Service) touch(job *domain.Job) {
 	if isRecoverableJobStatus(job.Status) {
 		job.RunOwnerID = s.instanceID
 		job.RunHeartbeatAt = now
+		s.cacheUpdate(job)
 		return
 	}
 	job.RunOwnerID = ""
 	job.RunHeartbeatAt = time.Time{}
+	s.cacheUpdate(job)
 }
 
 func (s *Service) touchChain(chain *domain.JobChain) {

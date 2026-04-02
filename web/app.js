@@ -75,7 +75,7 @@ function badgeClass(status) {
 }
 
 function makeBadge(status) {
-	return '<span class="badge ' + badgeClass(status) + '">' + esc(status || 'unknown') + '</span>';
+	return '<span class="badge ' + esc(badgeClass(status)) + '">' + esc(status || 'unknown') + '</span>';
 }
 
 // --- Time formatter ---
@@ -885,9 +885,21 @@ function showToast(message, type) {
 	var toast = document.createElement('div');
 	toast.className = 'toast toast-' + type;
 	toast.id = id;
-	toast.innerHTML = '<span class="toast-icon">' + (iconMap[type] || iconMap.info) + '</span>' +
-		'<span class="toast-msg">' + esc(message) + '</span>' +
-		'<button class="toast-close" onclick="dismissToast(\'' + id + '\')" aria-label="Dismiss">&times;</button>';
+	// Use DOM construction -- never assign user-controlled content via innerHTML
+	var iconSpan = document.createElement('span');
+	iconSpan.className = 'toast-icon';
+	iconSpan.innerHTML = iconMap[type] || iconMap.info; // safe: hard-coded HTML entities only
+	var msgSpan = document.createElement('span');
+	msgSpan.className = 'toast-msg';
+	msgSpan.textContent = message; // safe: textContent never parses HTML
+	var closeBtn = document.createElement('button');
+	closeBtn.className = 'toast-close';
+	closeBtn.setAttribute('aria-label', 'Dismiss');
+	closeBtn.innerHTML = '&times;'; // safe: hard-coded entity
+	closeBtn.addEventListener('click', (function(tid) { return function() { dismissToast(tid); }; })(id));
+	toast.appendChild(iconSpan);
+	toast.appendChild(msgSpan);
+	toast.appendChild(closeBtn);
 	container.appendChild(toast);
 	setTimeout(function() { dismissToast(id); }, 5000);
 }

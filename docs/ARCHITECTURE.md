@@ -16,6 +16,7 @@ internal/
   mcpsmoke/smoke.go              -- MCP subprocess client + isolated smoke scenarios
   orchestrator/
     service.go                   -- Core runLoop, job lifecycle, chain lifecycle, steer, harness ownership
+                                 --   jobCache (sync.RWMutex + map[string]*domain.Job) for low-latency status reads
     planning.go                  -- Planner phase, strictness/context normalization, sprint contract build
     evaluator.go                 -- Completion gate, evaluator merge, strictness-aware verification
     verification.go              -- Verification contract build/load/prompt helpers
@@ -48,7 +49,7 @@ Notes:
 ## State Model
 
 ```text
-Job: starting -> waiting_leader -> waiting_worker -> running -> ... -> done / failed / blocked
+Job: starting -> planning -> waiting_leader -> waiting_worker -> running -> ... -> done / failed / blocked
 Step: pending -> active -> succeeded / failed / blocked / skipped
 ChainGoal: pending -> running -> done / failed / skipped
 JobChain: running -> paused -> running -> done / failed / cancelled
@@ -56,6 +57,7 @@ JobChain: running -> paused -> running -> done / failed / cancelled
 
 Notes:
 - `JobStatusQueued` exists in `types.go` but `Start` and `StartAsync` currently create jobs in `starting`.
+- `JobStatusPlanning` is set during the planner phase (`ensurePlanning()`) so the UI shows a distinct planning state instead of collapsing it into `starting`.
 - `complete` never transitions directly to `done`; `evaluateCompletion()` must pass first.
 - `blockedReasonStrikeCount()` fails the job after the same blocked reason is recorded three times in a row.
 - `runLoop()` is single-flight per job ID within a process. Duplicate `Resume()` / recovery attempts for the same job return the latest persisted snapshot instead of starting another provider turn.

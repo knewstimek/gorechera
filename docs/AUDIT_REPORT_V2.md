@@ -49,7 +49,7 @@ Both commands pass cleanly. No compilation errors or vet warnings.
 
 ### CRITICAL
 
-#### XSS-1 -- web/app.js:847 -- showToast() injects unescaped message into innerHTML
+#### XSS-1 -- web/app.js:847 -- showToast() injects unescaped message into innerHTML [FIXED]
 
 ```js
 // app.js line ~847
@@ -66,7 +66,7 @@ function showToast(message, type) {
 
 ### HIGH
 
-#### XSS-2 -- web/app.js:77 -- makeBadge() writes status into innerHTML without esc()
+#### XSS-2 -- web/app.js:77 -- makeBadge() writes status into innerHTML without esc() [FIXED]
 
 ```js
 // app.js line ~77
@@ -81,7 +81,7 @@ function makeBadge(status) {
 
 ---
 
-#### H1 -- internal/orchestrator/planning.go:291-293 -- Dead assignment loses acceptance criteria
+#### H1 -- internal/orchestrator/planning.go:291-293 -- Dead assignment loses acceptance criteria [FIXED]
 
 ```go
 func validatePlanningArtifact(plan domain.PlanningArtifact, job domain.Job) error {
@@ -98,7 +98,7 @@ func validatePlanningArtifact(plan domain.PlanningArtifact, job domain.Job) erro
 
 ---
 
-#### H2 -- internal/api/server.go:57 -- Non-constant-time token comparison
+#### H2 -- internal/api/server.go:57 -- Non-constant-time token comparison [FIXED]
 
 ```go
 if auth != "Bearer "+token {
@@ -110,7 +110,7 @@ String comparison via `!=` short-circuits on the first differing byte, enabling 
 
 ---
 
-#### H3 -- internal/api/server.go (multiple lines) -- Raw internal errors exposed to HTTP clients
+#### H3 -- internal/api/server.go (multiple lines) -- Raw internal errors exposed to HTTP clients [FIXED]
 
 Lines 74, 95, 120, 133-134, 149-150, 163-164, 187-188, 210-212 all call:
 
@@ -362,11 +362,11 @@ MaxSteps int `json:"max_steps"`
 
 | ID     | Severity | File                                        | Line(s)   | Issue                                                      |
 |--------|----------|---------------------------------------------|-----------|------------------------------------------------------------|
-| XSS-1  | CRITICAL | web/app.js                                  | 847       | showToast() injects unescaped message into innerHTML       |
-| XSS-2  | HIGH     | web/app.js                                  | 77        | makeBadge() writes status into innerHTML without esc()     |
-| H1     | HIGH     | internal/orchestrator/planning.go           | 291-293   | Dead assignment: acceptance criteria never written back    |
-| H2     | HIGH     | internal/api/server.go                      | 57        | Non-constant-time bearer token comparison                  |
-| H3     | HIGH     | internal/api/server.go                      | 74,95,120+| Raw err.Error() exposed in HTTP responses                  |
+| XSS-1  | CRITICAL | web/app.js                                  | 847       | showToast() injects unescaped message into innerHTML **[FIXED]** |
+| XSS-2  | HIGH     | web/app.js                                  | 77        | makeBadge() writes status into innerHTML without esc() **[FIXED]** |
+| H1     | HIGH     | internal/orchestrator/planning.go           | 291-293   | Dead assignment: acceptance criteria never written back **[FIXED]** |
+| H2     | HIGH     | internal/api/server.go                      | 57        | Non-constant-time bearer token comparison **[FIXED]**      |
+| H3     | HIGH     | internal/api/server.go                      | 74,95,120+| Raw err.Error() exposed in HTTP responses **[FIXED]**      |
 | XSS-3  | MEDIUM   | web/app.js                                  | 798-804   | esc() missing single-quote escape and javascript: blocking |
 | XSS-4  | MEDIUM   | web/app.js                                  | 958-962   | renderEmptyState() title/hint unescaped                    |
 | JS-1   | MEDIUM   | web/app.js                                  | 465       | Silent catch{} hides all SSE handler errors                |

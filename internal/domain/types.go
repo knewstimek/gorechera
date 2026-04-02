@@ -10,6 +10,7 @@ type JobStatus string
 const (
 	JobStatusQueued        JobStatus = "queued"
 	JobStatusStarting      JobStatus = "starting"
+	JobStatusPlanning      JobStatus = "planning"
 	JobStatusRunning       JobStatus = "running"
 	JobStatusWaitingLeader JobStatus = "waiting_leader"
 	JobStatusWaitingWorker JobStatus = "waiting_worker"
@@ -419,4 +420,77 @@ type Job struct {
 	Events                  []Event                `json:"events,omitempty"`
 	CreatedAt               time.Time              `json:"created_at"`
 	UpdatedAt               time.Time              `json:"updated_at"`
+}
+
+// CloneJob returns a deep copy of the job so that the caller cannot mutate
+// the original through shared slice/map/pointer fields. Used by the in-memory
+// cache to prevent external callers from corrupting the authoritative state.
+func CloneJob(src *Job) *Job {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+
+	// Deep-copy slices of value types.
+	dst.Constraints = append([]string(nil), src.Constraints...)
+	dst.DoneCriteria = append([]string(nil), src.DoneCriteria...)
+	dst.PlanningArtifacts = append([]string(nil), src.PlanningArtifacts...)
+
+	// Deep-copy Steps (slice of structs, but each step has inner slices).
+	if len(src.Steps) > 0 {
+		dst.Steps = make([]Step, len(src.Steps))
+		for i, step := range src.Steps {
+			cp := step
+			cp.Artifacts = append([]string(nil), step.Artifacts...)
+			if step.StructuredReason != nil {
+				sr := *step.StructuredReason
+				cp.StructuredReason = &sr
+			}
+			dst.Steps[i] = cp
+		}
+	}
+
+	// Deep-copy Events.
+	if len(src.Events) > 0 {
+		dst.Events = make([]Event, len(src.Events))
+		copy(dst.Events, src.Events)
+	}
+
+	// Deep-copy pointer fields.
+	if src.PendingApproval != nil {
+		pa := *src.PendingApproval
+		if src.PendingApproval.SystemAction != nil {
+			sa := *src.PendingApproval.SystemAction
+			sa.Args = append([]string(nil), src.PendingApproval.SystemAction.Args...)
+			pa.SystemAction = &sa
+		}
+		dst.PendingApproval = &pa
+	}
+	if src.VerificationContract != nil {
+		vc := *src.VerificationContract
+		vc.Scope = append([]string(nil), src.VerificationContract.Scope...)
+		vc.RequiredCommands = append([]string(nil), src.VerificationContract.RequiredCommands...)
+		vc.RequiredArtifacts = append([]string(nil), src.VerificationContract.RequiredArtifacts...)
+		vc.RequiredChecks = append([]string(nil), src.VerificationContract.RequiredChecks...)
+		vc.DisallowedActions = append([]string(nil), src.VerificationContract.DisallowedActions...)
+		if len(src.VerificationContract.RubricAxes) > 0 {
+			vc.RubricAxes = make([]RubricAxis, len(src.VerificationContract.RubricAxes))
+			copy(vc.RubricAxes, src.VerificationContract.RubricAxes)
+		}
+		dst.VerificationContract = &vc
+	}
+	if src.ChainContext != nil {
+		cc := *src.ChainContext
+		dst.ChainContext = &cc
+	}
+
+	// Deep-copy RoleOverrides map.
+	if len(src.RoleOverrides) > 0 {
+		dst.RoleOverrides = make(map[string]RoleProfile, len(src.RoleOverrides))
+		for k, v := range src.RoleOverrides {
+			dst.RoleOverrides[k] = v
+		}
+	}
+
+	return &dst
 }

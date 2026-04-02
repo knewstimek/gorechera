@@ -659,7 +659,7 @@ func gitRun(dir string, args ...string) error {
 
 func isRecoverableStatus(status domain.JobStatus) bool {
 	switch status {
-	case domain.JobStatusStarting, domain.JobStatusRunning, domain.JobStatusWaitingLeader, domain.JobStatusWaitingWorker:
+	case domain.JobStatusStarting, domain.JobStatusPlanning, domain.JobStatusRunning, domain.JobStatusWaitingLeader, domain.JobStatusWaitingWorker:
 		return true
 	default:
 		return false

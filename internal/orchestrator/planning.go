@@ -89,7 +89,7 @@ func (s *Service) runPlannerPhase(ctx context.Context, job *domain.Job) (domain.
 	if err := json.Unmarshal([]byte(raw), &out); err != nil {
 		return domain.PlanningArtifact{}, err
 	}
-	if err := validatePlanningArtifact(out, *job); err != nil {
+	if err := validatePlanningArtifact(&out, *job); err != nil {
 		return domain.PlanningArtifact{}, err
 	}
 	return out, nil
@@ -284,13 +284,16 @@ func cloneVerificationContract(seed *domain.PlanningArtifact) *domain.Verificati
 	return &contract
 }
 
-func validatePlanningArtifact(plan domain.PlanningArtifact, job domain.Job) error {
+func validatePlanningArtifact(plan *domain.PlanningArtifact, job domain.Job) error {
 	if strings.TrimSpace(plan.Goal) == "" {
 		return fmt.Errorf("planner output requires goal")
 	}
 	if strings.TrimSpace(plan.Summary) == "" {
 		return fmt.Errorf("planner output requires summary")
 	}
+	// Populate Acceptance from job criteria when the planner omits it,
+	// so the sprint contract has criteria to enforce. Without pointer
+	// semantics this assignment was silently discarded.
 	if len(plan.Acceptance) == 0 {
 		plan.Acceptance = job.DoneCriteria
 	}

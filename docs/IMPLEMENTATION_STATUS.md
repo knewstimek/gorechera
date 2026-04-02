@@ -168,6 +168,33 @@ go test ./...    # PASS
   - `wait=true` polling for job and chain status with configurable `wait_timeout` (default 30s, 0=5min maximum)
   - `gorchera_steer`
 
+## In-Memory Job Cache And JobStatusPlanning (2026-04-02)
+
+UX fix: status API now returns current in-memory state without disk round-trips between writes.
+
+- `Service` carries a `sync.RWMutex` + `map[string]*domain.Job` jobCache field.
+- `Service.Get()` checks the cache first; falls back to disk only on a cache miss.
+- `addEvent`, `touch`, and `accumulateTokenUsage` write the updated job into the cache immediately after each mutation.
+- `List()` overlays in-flight cache entries on top of the disk listing so callers see live state.
+- Terminal states (`done`, `failed`, `blocked`) are evicted from the cache after the final write to bound memory usage.
+- `domain.JobStatusPlanning` added: set during `ensurePlanning()` so the UI shows a distinct planning state instead of collapsing the planner phase into `starting`.
+- `domain.CloneJob()` deep-copy helper added to protect the cache from aliasing when callers mutate returned values.
+
+## Security Audit V2 Fixes (2026-04-02)
+
+CRITICAL and HIGH findings from `docs/AUDIT_REPORT_V2.md` have been fixed. `go build ./...` and `go test ./...` pass with no regressions.
+
+### XSS fixes (web/app.js)
+
+- **XSS-1 (`showToast`):** Replaced `toast.innerHTML = \`<span>${message}</span>\`` with DOM `createElement`/`textContent` to eliminate the unescaped innerHTML sink.
+- **XSS-2 (`makeBadge`):** Applied `esc()` to the `class` attribute interpolation (`badge-${status}`) in addition to the text content.
+
+### Go backend fixes
+
+- **H1 (`internal/orchestrator/planning.go`):** Changed `validatePlanningArtifact` parameter from value `domain.PlanningArtifact` to pointer `*domain.PlanningArtifact` so the acceptance-criteria fallback assignment is no longer a dead write.
+- **H2 (`internal/api/server.go`):** Bearer token comparison switched from `string !=` to `crypto/subtle.ConstantTimeCompare` to eliminate the timing side-channel.
+- **H3 (`internal/api/server.go`):** All `http.Error(w, err.Error(), ...)` call sites replaced with a generic `"internal error"` message; the original error is logged server-side via `log.Printf`.
+
 ## Security Audit Fixes (2026-04-02)
 
 All 10 HIGH severity findings from `docs/AUDIT_REPORT.md` have been fixed. `go build ./...` and `go test ./...` pass with no regressions.
