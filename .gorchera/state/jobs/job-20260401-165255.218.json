@@ -1,0 +1,47 @@
+{
+  "id": "job-20260401-165255.218",
+  "goal": "List files",
+  "tech_stack": "go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "role_profiles": {
+    "planner": {
+      "provider": "claude"
+    },
+    "leader": {
+      "provider": "claude"
+    },
+    "executor": {
+      "provider": "claude"
+    },
+    "reviewer": {
+      "provider": "claude"
+    },
+    "tester": {
+      "provider": "claude"
+    },
+    "evaluator": {
+      "provider": "claude"
+    }
+  },
+  "status": "failed",
+  "provider": "claude",
+  "max_steps": 8,
+  "current_step": 0,
+  "retry_count": 0,
+  "failure_reason": "planner execution failed: planner output requires goal | unwrap: \u003cnil\u003e",
+  "leader_context_summary": "Goal: List files",
+  "events": [
+    {
+      "time": "2026-04-01T16:52:55.2182399Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T16:53:10.9843056Z",
+      "kind": "job_failed",
+      "message": "planner execution failed: planner output requires goal | unwrap: \u003cnil\u003e"
+    }
+  ],
+  "created_at": "2026-04-01T16:52:55.2182399Z",
+  "updated_at": "2026-04-01T16:53:10.9843056Z"
+}

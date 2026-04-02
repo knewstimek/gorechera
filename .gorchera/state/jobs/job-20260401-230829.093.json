@@ -1,0 +1,168 @@
+{
+  "id": "job-20260401-230829.093",
+  "goal": "Fix 4 high-severity audit findings. DO NOT add new features, only fix the issues described:\n\n1. SUPERVISOR prompt injection: In internal/orchestrator/service.go, wherever worker/system summaries or block reasons are written to job.LeaderContextSummary, strip any text that starts with \"[SUPERVISOR]\" from the untrusted input. Add a helper sanitizeLeaderContext(text string) string that removes lines starting with \"[SUPERVISOR]\". Apply it in runWorkerStep and runSystemStep when setting LeaderContextSummary.\n\n2. Workspace validation strengthening: In both internal/orchestrator/service.go validateWorkspaceDir and internal/mcp/server.go validateWorkspaceDir, add: (a) require absolute path using filepath.IsAbs, (b) resolve symlinks with filepath.EvalSymlinks before stat check. Unify the two copies into one shared function if possible (put in a new file internal/orchestrator/workspace.go and import from mcp).\n\n3. Steer authorization: In internal/orchestrator/service.go Steer method, check that job.Status is \"running\" or \"waiting_leader\" or \"waiting_worker\" before accepting the directive. Return error for done/failed/cancelled jobs.\n\n4. Steer directive preservation: In internal/orchestrator/service.go, instead of writing to LeaderContextSummary directly, add a new field SupervisorDirective string to domain.Job (in internal/domain/types.go). Steer writes to this field. In internal/provider/protocol.go buildLeaderPrompt, if job.SupervisorDirective is non-empty, include it as a separate section BEFORE the job state. After the leader processes it (when runLoop gets the next leader response), clear the field.\n\nRun go build ./... and go test ./... to verify.",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "strictness_level": "normal",
+  "context_mode": "full",
+  "role_profiles": {
+    "planner": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "codex",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that the four audit findings are fixed with no scope expansion and that the codebase still builds and tests cleanly.",
+    "scope": [
+      "Leader-context sanitization for untrusted worker/system input.",
+      "Shared workspace validation with absolute-path and symlink resolution checks.",
+      "Steer authorization restricted to active job states.",
+      "Supervisor directive preservation, prompt placement, and one-time clearing.",
+      "Regression coverage and repository-wide build/test verification."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\workspace.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\mcp\\server.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\domain\\types.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go",
+      ".gorechera\\artifacts\\job-20260401-230829.093\\verification_contract.json"
+    ],
+    "required_checks": [
+      "Confirm `sanitizeLeaderContext` exists and is used at the `LeaderContextSummary` assignment sites fed by worker/system outputs or block reasons.",
+      "Confirm shared workspace validation enforces `filepath.IsAbs` and calls `filepath.EvalSymlinks` before directory existence/type checks.",
+      "Confirm `Steer` rejects non-active statuses and no longer stores directives in `LeaderContextSummary`.",
+      "Confirm `domain.Job.SupervisorDirective` is rendered as a distinct leader-prompt section before job state and is cleared after the subsequent leader response is processed.",
+      "Confirm any new or updated tests cover the changed behaviors and repository-wide build/test commands pass."
+    ],
+    "disallowed_actions": [
+      "Do not add new features or broaden scope beyond the four findings.",
+      "Do not bypass evaluator-gate or alter approval/harness semantics.",
+      "Do not keep duplicated workspace validators if a cycle-free shared helper is possible.",
+      "Do not let untrusted `[SUPERVISOR]` lines reach `LeaderContextSummary`.",
+      "Do not store supervisor directives in `LeaderContextSummary` after the fix.",
+      "Do not introduce Windows-only core logic."
+    ],
+    "max_seconds": 900,
+    "notes": "Prefer a minimal patch set. If importing orchestrator from MCP would create a package cycle, move the shared validator to the smallest cycle-free internal package while preserving the same behavior and scope.",
+    "owner_role": "executor"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-230829.093\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-230829.093\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-230829.093\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-230829.093\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-230829.093\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-230829.093\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-230829.093\\evaluator_report.json",
+  "status": "done",
+  "provider": "codex",
+  "max_steps": 8,
+  "current_step": 1,
+  "retry_count": 0,
+  "summary": "The required audit fixes were implemented in scope, focused tests were added or updated for each behavior, and verification was reported complete with `go build ./...` and `go test ./...` passing. Sprint step coverage is satisfied, so this is ready for evaluator-gated completion.",
+  "leader_context_summary": "The job state includes a succeeded implement step that directly covers all four audit fixes and reports successful repository-wide verification with `go build ./...` and `go test ./...`.",
+  "token_usage": {
+    "input_tokens": 13157,
+    "output_tokens": 3998,
+    "total_tokens": 17155,
+    "estimated_cost_usd": 0.017155
+  },
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Implement the 4 audit fixes in a minimal patch set and verify with full build/test. Scope: (1) In `internal/orchestrator/service.go`, add `sanitizeLeaderContext(text string) string` that removes any line starting with `[SUPERVISOR]`, and apply it anywhere untrusted worker/system summaries or block reasons are assigned to `job.LeaderContextSummary` in `runWorkerStep` and `runSystemStep`. (2) Strengthen workspace validation by requiring absolute paths with `filepath.IsAbs` and resolving symlinks with `filepath.EvalSymlinks` before stat/type checks; unify the duplicated validators from `internal/orchestrator/service.go` and `internal/mcp/server.go` into one shared helper if cycle-free, preferably `internal/orchestrator/workspace.go`, otherwise the smallest shared internal package. (3) In `internal/orchestrator/service.go` `Steer`, reject directives unless `job.Status` is `running`, `waiting_leader`, or `waiting_worker`; return an error for done/failed/cancelled states. (4) Preserve supervisor directives separately: add `SupervisorDirective string` to `internal/domain/types.go`; make `Steer` write there instead of `LeaderContextSummary`; in `internal/provider/protocol.go` `buildLeaderPrompt`, render `SupervisorDirective` as its own section before the job state; after the subsequent leader response is processed in the run loop, clear `job.SupervisorDirective`. Add or update focused tests for these behaviors without expanding scope. Update docs only if directly required by the changed behavior. Then run `go build ./...` and `go test ./...` and report changed files, test coverage added, and verification results.",
+      "status": "succeeded",
+      "summary": "Implemented the 4 audit fixes in a minimal patch set. Changed files: internal/domain/types.go, internal/orchestrator/workspace.go, internal/orchestrator/service.go, internal/mcp/server.go, internal/provider/protocol.go, internal/orchestrator/service_test.go, internal/mcp/server_test.go, internal/provider/provider_test.go. Key fixes: added Job.SupervisorDirective and moved Steer to use it; restricted Steer to running/waiting_leader/waiting_worker; cleared SupervisorDirective after the next successful leader turn is received; added sanitizeLeaderContext and applied it to worker/system leader-context writes plus blocked-reason persistence; centralized workspace validation in orchestrator.ValidateWorkspaceDir with absolute-path enforcement and EvalSymlinks before stat checks; MCP now uses the shared validator; leader prompt renders a separate Supervisor directive section before job state and excludes the directive from the serialized job payload. Test coverage added/updated for absolute-path validation, symlink validation, steer persistence/rejection, one-time directive clearing, worker leader-context sanitization, MCP relative-workspace rejection, and leader-prompt supervisor section placement. Commands run: gofmt -w on modified files; go test ./internal/orchestrator ./internal/mcp ./internal/provider -run \u003cfocused tests\u003e; go build ./...; go test ./.... Errors encountered and resolved during implementation: initial targeted tests exposed Windows EvalSymlinks returning \"Access is denied\" for non-symlink temp directories, so the shared validator now falls back to the cleaned path only after attempting EvalSymlinks and confirming the existing path is not itself a symlink; targeted test fixtures also needed MaxSteps/step-state adjustments and a valid blocked_reason for blocked worker schema validation. Final verification: go build ./... passed, go test ./... passed.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-230829.093\\step-01-types.go",
+        ".gorechera\\artifacts\\job-20260401-230829.093\\step-01-workspace.go",
+        ".gorechera\\artifacts\\job-20260401-230829.093\\step-01-service.go",
+        ".gorechera\\artifacts\\job-20260401-230829.093\\step-01-server.go",
+        ".gorechera\\artifacts\\job-20260401-230829.093\\step-01-protocol.go",
+        ".gorechera\\artifacts\\job-20260401-230829.093\\step-01-service_test.go",
+        ".gorechera\\artifacts\\job-20260401-230829.093\\step-01-server_test.go",
+        ".gorechera\\artifacts\\job-20260401-230829.093\\step-01-provider_test.go"
+      ],
+      "token_usage": {
+        "input_tokens": 10352,
+        "output_tokens": 1412,
+        "total_tokens": 11764,
+        "estimated_cost_usd": 0.011764
+      },
+      "started_at": "2026-04-01T23:09:47.0377022Z",
+      "finished_at": "2026-04-01T23:19:36.9873149Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T23:08:29.0935418Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T23:09:32.2424856Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T23:09:32.2439754Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:09:47.0377022Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T23:19:36.9873149Z",
+      "kind": "worker_succeeded",
+      "message": "Implemented the 4 audit fixes in a minimal patch set. Changed files: internal/domain/types.go, internal/orchestrator/workspace.go, internal/orchestrator/service.go, internal/mcp/server.go, internal/provider/protocol.go, internal/orchestrator/service_test.go, internal/mcp/server_test.go, internal/provider/provider_test.go. Key fixes: added Job.SupervisorDirective and moved Steer to use it; restricted Steer to running/waiting_leader/waiting_worker; cleared SupervisorDirective after the next successful leader turn is received; added sanitizeLeaderContext and applied it to worker/system leader-context writes plus blocked-reason persistence; centralized workspace validation in orchestrator.ValidateWorkspaceDir with absolute-path enforcement and EvalSymlinks before stat checks; MCP now uses the shared validator; leader prompt renders a separate Supervisor directive section before job state and excludes the directive from the serialized job payload. Test coverage added/updated for absolute-path validation, symlink validation, steer persistence/rejection, one-time directive clearing, worker leader-context sanitization, MCP relative-workspace rejection, and leader-prompt supervisor section placement. Commands run: gofmt -w on modified files; go test ./internal/orchestrator ./internal/mcp ./internal/provider -run \u003cfocused tests\u003e; go build ./...; go test ./.... Errors encountered and resolved during implementation: initial targeted tests exposed Windows EvalSymlinks returning \"Access is denied\" for non-symlink temp directories, so the shared validator now falls back to the cleaned path only after attempting EvalSymlinks and confirming the existing path is not itself a symlink; targeted test fixtures also needed MaxSteps/step-state adjustments and a valid blocked_reason for blocked worker schema validation. Final verification: go build ./... passed, go test ./... passed."
+    },
+    {
+      "time": "2026-04-01T23:19:36.988312Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:20:05.827671Z",
+      "kind": "evaluation_passed",
+      "message": "The job state includes a succeeded implement step that directly covers all four audit fixes and reports successful repository-wide verification with `go build ./...` and `go test ./...`."
+    },
+    {
+      "time": "2026-04-01T23:20:05.8286643Z",
+      "kind": "job_completed",
+      "message": "The required audit fixes were implemented in scope, focused tests were added or updated for each behavior, and verification was reported complete with `go build ./...` and `go test ./...` passing. Sprint step coverage is satisfied, so this is ready for evaluator-gated completion."
+    }
+  ],
+  "created_at": "2026-04-01T23:08:29.0935418Z",
+  "updated_at": "2026-04-01T23:20:05.8286643Z"
+}

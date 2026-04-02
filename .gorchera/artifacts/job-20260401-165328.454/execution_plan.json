@@ -1,0 +1,57 @@
+{
+  "goal": "List the files in the current directory and summarize the project structure",
+  "tech_stack": "go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Read-only reconnaissance task: enumerate all files in D:\\News\\Business\\AIOrchestrator and produce a structured summary of the Gorechera project layout, package responsibilities, and key entry points. No code changes required.",
+  "product_scope": [
+    "Enumerate all files/directories in the workspace root",
+    "Identify Go package structure under cmd/ and internal/",
+    "Summarize each package's responsibility in 1-2 sentences",
+    "Note key entry points (main.go, service.go, provider.go)",
+    "List documentation files and their topics",
+    "Report artifact/state storage layout under .gorechera/"
+  ],
+  "non_goals": [
+    "No code modifications",
+    "No build or test execution",
+    "No dependency analysis beyond go.mod"
+  ],
+  "proposed_steps": [
+    "Step 1 (executor): List all files recursively (excluding .git), group by top-level directory, and produce a tree-style summary",
+    "Step 2 (executor): Read package doc comments or first lines of key .go files to summarize each package's role: cmd/gorechera, internal/api, internal/domain, internal/orchestrator, internal/policy, internal/provider, internal/runtime, internal/schema, internal/store",
+    "Step 3 (executor): Compile final summary artifact with: (a) directory tree, (b) package responsibility table, (c) entry points, (d) doc index"
+  ],
+  "success_signals": [
+    "Complete file listing produced",
+    "All 9 Go packages described",
+    "Entry points identified",
+    "Summary artifact written to step artifacts"
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify the project structure summary is accurate and complete",
+    "scope": [
+      "Accuracy of file listing against actual filesystem",
+      "Correctness of package descriptions against source code",
+      "No fabricated files or packages"
+    ],
+    "required_commands": [
+      "go build ./..."
+    ],
+    "required_artifacts": [
+      "step-NN-project_structure_summary.md"
+    ],
+    "required_checks": [
+      "File tree matches output of recursive directory listing",
+      "Each listed Go package exists and description matches its actual code",
+      "Entry points (main.go, service.go, provider.go) are correctly identified"
+    ],
+    "disallowed_actions": [
+      "No file creation or modification outside artifacts",
+      "No code changes"
+    ],
+    "max_seconds": 60,
+    "notes": "Read-only task. Build command is a sanity check only -- no tests needed.",
+    "owner_role": "tester"
+  }
+}

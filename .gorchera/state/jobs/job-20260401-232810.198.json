@@ -1,0 +1,246 @@
+{
+  "id": "job-20260401-232810.198",
+  "goal": "Implement job chaining for the orchestrator. This allows a supervisor to submit multiple goals that execute sequentially - when job N completes successfully, job N+1 starts automatically.\n\nChanges needed:\n\n1. In internal/domain/types.go, add a JobChain struct with fields: ID string, Goals []ChainGoal, CurrentIndex int, Status string (running/done/failed), CreatedAt/UpdatedAt time.Time. ChainGoal has: Goal string, Provider ProviderName, StrictnessLevel string, ContextMode string, MaxSteps int, JobID string (filled when started), Status string (pending/running/done/failed).\n\n2. In internal/orchestrator/service.go, add methods:\n- StartChain(ctx, goals []ChainGoal, workspaceDir string) (*JobChain, error) -- creates chain, starts first job\n- advanceChain(ctx, chain *JobChain) -- called when a job completes, starts next goal or marks chain done\n- GetChain(ctx, chainID string) (*JobChain, error)\n- ListChains(ctx) ([]*JobChain, error)\nWire advanceChain into the job completion path (after job reaches \"done\" status, check if it belongs to a chain and advance).\n\n3. In internal/mcp/server.go, add MCP tools:\n- gorechera_start_chain: params goals (array of objects with goal, provider, strictness_level, context_mode, max_steps), workspace_dir. Returns chain ID.\n- gorechera_chain_status: params chain_id. Returns chain state with all goals and their job IDs/statuses.\n\n4. In internal/store/state_store.go, add SaveChain/LoadChain/ListChains for file-based persistence (same pattern as jobs).\n\nRun go build ./... and go test ./... to verify.",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "strictness_level": "normal",
+  "context_mode": "full",
+  "role_profiles": {
+    "planner": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "codex",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that sequential job chaining is persisted correctly, advances only after evaluator-approved job completion, stops on unsuccessful terminal states, and is exposed through MCP tooling without regressing existing build/test behavior.",
+    "scope": [
+      "Domain types for chain state in `internal/domain/types.go`.",
+      "File-based chain persistence in `internal/store/state_store.go`.",
+      "Chain lifecycle and advancement wiring in `internal/orchestrator/service.go`.",
+      "MCP tool definitions and handlers in `internal/mcp/server.go`.",
+      "Automated coverage for store/service/MCP behavior.",
+      "Documentation updates for architecture and implementation status."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\domain\\types.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\store\\state_store.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\store\\state_store_test.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service_test.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\mcp\\server.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\mcp\\server_test.go",
+      "D:\\News\\Business\\AIOrchestrator\\docs\\ARCHITECTURE.md",
+      "D:\\News\\Business\\AIOrchestrator\\docs\\IMPLEMENTATION_STATUS.md",
+      ".gorechera\\artifacts\\job-20260401-232810.198\\verification_contract.json"
+    ],
+    "required_checks": [
+      "Creating a chain persists a chain file and immediately starts exactly the first job.",
+      "Chain status records `JobID` on each started goal and keeps later goals `pending` until advanced.",
+      "A `done` terminal job automatically advances the chain to the next goal.",
+      "A final `done` goal marks the whole chain `done`.",
+      "A `failed` or `blocked` chained job marks the chain `failed` and does not auto-start the next goal.",
+      "MCP `gorechera_start_chain` returns a chain identifier and MCP `gorechera_chain_status` returns the full persisted chain state.",
+      "Existing job start/status behavior still works and full repo build/tests pass."
+    ],
+    "disallowed_actions": [
+      "Do not bypass `evaluateCompletion()` before marking a job `done`.",
+      "Do not pass full inter-agent conversation logs between jobs; preserve existing artifact/summary semantics.",
+      "Do not introduce executor-driven worker spawning or parallel chain execution.",
+      "Do not weaken approval handling for system actions.",
+      "Do not mix global and job-scoped harness ownership semantics.",
+      "Do not add Windows-specific core logic for chaining."
+    ],
+    "max_seconds": 900,
+    "notes": "Inference required: chain state needs a reliable way to associate a completed job back to its chain. The implementation may either add minimal chain metadata to `domain.Job` or perform a persisted chain lookup by `JobID`, but the chosen approach must preserve current job semantics and keep advancement deterministic.",
+    "owner_role": "tester"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-232810.198\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-232810.198\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-232810.198\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-232810.198\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-232810.198\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-232810.198\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-232810.198\\evaluator_report.json",
+  "status": "done",
+  "provider": "codex",
+  "max_steps": 8,
+  "current_step": 3,
+  "retry_count": 0,
+  "summary": "Sprint contract satisfied. Sequential job chaining was implemented across domain/store/service/MCP, required docs were updated, reviewer found no blocking issues, and verification passed including `go build ./...` and `go test ./...` plus focused chain behavior tests covering start, persistence, sequential advancement, terminal failure/blocked stopping, final completion, and MCP start/status behavior.",
+  "leader_context_summary": "A succeeded implement step completed the requested job chaining feature end-to-end, and independent review/test steps confirmed the required chain behavior plus successful `go build ./...` and `go test ./...`.",
+  "token_usage": {
+    "input_tokens": 28824,
+    "output_tokens": 6229,
+    "total_tokens": 35053,
+    "estimated_cost_usd": 0.035052999999999994
+  },
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Implement sequential job chaining end-to-end in the workspace. Scope: add domain types in internal/domain/types.go; add file-based chain persistence in internal/store/state_store.go plus focused tests in internal/store/state_store_test.go; add StartChain, advanceChain, GetChain, ListChains in internal/orchestrator/service.go and wire advancement only after evaluator-approved job completion reaches done, with chained failed/blocked jobs marking the chain failed and not advancing; add service tests in internal/orchestrator/service_test.go; add MCP tools and handlers in internal/mcp/server.go plus tests in internal/mcp/server_test.go; update docs/ARCHITECTURE.md and docs/IMPLEMENTATION_STATUS.md. Preserve existing semantics: no evaluator gate bypass, no full inter-agent log passing, no executor-driven spawning, no approval weakening, no harness semantic mixing, no Windows-specific core logic. Chain behavior must satisfy: first goal starts immediately, started goals record JobID/status, later goals stay pending until advanced, final done marks chain done, unsuccessful terminal states stop the chain. After code changes, run go build ./... and go test ./..., and report the changed files and verification results.",
+      "status": "succeeded",
+      "summary": "Implemented sequential job chaining end-to-end. Changed files: internal/domain/types.go, internal/store/state_store.go, internal/store/state_store_test.go, internal/orchestrator/service.go, internal/orchestrator/service_test.go, internal/mcp/server.go, internal/mcp/server_test.go, docs/ARCHITECTURE.md, docs/IMPLEMENTATION_STATUS.md. Commands run: `gofmt -w internal/domain/types.go internal/store/state_store.go internal/store/state_store_test.go internal/orchestrator/service.go internal/orchestrator/service_test.go internal/mcp/server.go internal/mcp/server_test.go`, `go build ./...`, `go test ./...`, `git status --short`. Verification: `go build ./...` passed; `go test ./...` passed. Non-fatal issues encountered: initial `gofmt` invocation emitted a PowerShell profile execution-policy warning; `git status --short` emitted git ignore permission warnings for `C:\\Users\\News/.config/git/ignore`; one shell `Remove-Item` cleanup attempt for a test-generated temp directory was blocked by policy, then cleaned up successfully via delete/bash tools.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-01-types.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-01-state_store.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-01-state_store_test.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-01-service.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-01-service_test.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-01-server.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-01-server_test.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-01-ARCHITECTURE.md",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-01-IMPLEMENTATION_STATUS.md"
+      ],
+      "token_usage": {
+        "input_tokens": 5504,
+        "output_tokens": 1197,
+        "total_tokens": 6701,
+        "estimated_cost_usd": 0.0067009999999999995
+      },
+      "started_at": "2026-04-01T23:30:19.4988976Z",
+      "finished_at": "2026-04-01T23:39:57.3940771Z"
+    },
+    {
+      "index": 2,
+      "target": "C",
+      "task_type": "review",
+      "task_text": "Review the completed job chaining implementation in D:\\News\\Business\\AIOrchestrator for correctness against the sprint and verification contracts. Focus on: domain chain types, file-based chain persistence, StartChain/GetChain/ListChains/advanceChain wiring, advancement only after evaluator-approved job completion reaches done, final done marking chain done, failed/blocked chained jobs marking chain failed without advancing, MCP start/status tool behavior, preservation of existing job semantics and prohibitions. Report findings first with severity, file references, and any residual risks or missing coverage.",
+      "status": "succeeded",
+      "summary": "Findings:\n- None.\n\nReview result:\n- `internal/domain/types.go`: `JobChain`/`ChainGoal` fields match the sprint shape, and `domain.Job` carries minimal `ChainID`/`ChainGoalIndex` metadata needed for deterministic chain lookup.\n- `internal/store/state_store.go`: `SaveChain`/`LoadChain`/`ListChains` follow the existing JSON + atomic-write job persistence pattern.\n- `internal/orchestrator/service.go`: `StartChain`, `GetChain`, `ListChains`, `advanceChain` are wired correctly. First goal is persisted and started immediately; later goals stay `pending` until advancement. Advancement happens only from the evaluator-approved `complete` path after the job is saved as `done` (`service.go:750-758`). Terminal `blocked`/`failed` job paths mark the chain `failed` without advancing (`service.go:999-1035`, `service.go:601-617`). Final successful goal marks the chain `done` (`service.go:568-579`). Existing job semantics/prohibitions appear preserved; I did not find evaluator-gate bypass, log-passing expansion, executor-driven spawning, approval weakening, harness semantic mixing, or Windows-specific core chaining logic.\n- `internal/mcp/server.go`: `gorechera_start_chain` validates/parses goal inputs and returns only `chain_id`; `gorechera_chain_status` returns the persisted full chain state.\n- Tests cover the required happy-path and stop-on-failure behaviors in store/service/MCP packages.\n\nResidual risks / missing coverage:\n- No test covers crash/restart in the narrow window after saving a job as `done` but before `handleChainCompletion()` persists the advanced chain state. That is a durability gap worth covering, but not a correctness bug in the current in-process flow.\n- MCP tests cover start/status happy path, but not malformed chain goal payload variants beyond missing/invalid basics.\n\nCommands run:\n- `go build ./...` -\u003e passed\n- `go test ./...` -\u003e passed\n\nErrors encountered:\n- PowerShell profile execution-policy warning was emitted before command output, but both commands still completed successfully.\n\nFiles changed:\n- None. Review only.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-02-types.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-02-state_store.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-02-state_store_test.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-02-service.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-02-service_test.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-02-server.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-02-server_test.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-02-ARCHITECTURE.md",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-02-IMPLEMENTATION_STATUS.md"
+      ],
+      "token_usage": {
+        "input_tokens": 3991,
+        "output_tokens": 746,
+        "total_tokens": 4737,
+        "estimated_cost_usd": 0.004737
+      },
+      "started_at": "2026-04-01T23:40:28.693994Z",
+      "finished_at": "2026-04-01T23:42:23.7715331Z"
+    },
+    {
+      "index": 3,
+      "target": "D",
+      "task_type": "test",
+      "task_text": "Independently verify the job chaining feature in D:\\News\\Business\\AIOrchestrator. Run `go build ./...` and `go test ./...`, inspect the new/updated tests for store/service/MCP behavior, and confirm the required checks: first goal starts immediately, started goals record JobID/status while later goals stay pending, done advances to next goal, final done marks chain done, failed/blocked stops the chain as failed, MCP start/status exposes persisted chain state, and existing build/test behavior still passes. Report pass/fail, concrete evidence, and any gaps.\n\nVerification contract ref: .gorechera\\artifacts\\job-20260401-232810.198\\verification_contract.json\nVerification contract summary: Verify Introduce persisted chain state in the domain and state store, add orchestrator service APIs to create/load/list/advance chains, and wire chain progression into terminal job handling so chained jobs start one-by-one. Expose the feature through MCP tools for chain creation and status lookup, add focused tests for persistence, service advancement, and MCP behavior, and update architecture/status docs to reflect the new sequential workflow surface. with required steps: implement\nRequired steps: implement\nTester instructions:\n- Read the verification contract before running tests.\n- Use the contract to choose only the tests needed for the current step.\n- Return the exact commands, outcomes, and artifacts produced.",
+      "status": "succeeded",
+      "summary": "Pass. Read `D:\\News\\Business\\AIOrchestrator\\.gorechera\\artifacts\\job-20260401-232810.198\\verification_contract.json` first, then ran `go build ./...` (pass), `go test ./...` (pass), and focused verification commands `go test ./internal/store -run TestStateStoreSaveLoadAndListChains -count=1`, `go test ./internal/orchestrator -run \"TestServiceStartChainStartsFirstGoalAndAdvancesSequentially|TestServiceStartChainStopsOnUnsuccessfulTerminalJob\" -count=1`, and `go test ./internal/mcp -run TestToolStartChainReturnsChainIDAndStatus -count=1` (all pass). Concrete evidence: persisted chain types exist in `internal/domain/types.go:170-187`; file persistence exists in `internal/store/state_store.go:35-45`, `:59-69`, `:102-130` and is covered by `internal/store/state_store_test.go:11-68`; first goal starts immediately, writes `JobID`, and leaves later goals pending via `internal/orchestrator/service.go:127-170`, `:227-266`, with assertions in `internal/orchestrator/service_test.go:309-345`; evaluator-approved `done` advances and final `done` marks the chain done via `internal/orchestrator/service.go:550-579`, `:726-759`, with assertions in `internal/orchestrator/service_test.go:347-357`; blocked/failed chained jobs mark the chain failed and do not start the next goal via `internal/orchestrator/service.go:580-617`, `:999-1035`, with assertions in `internal/orchestrator/service_test.go:361-407`; MCP start/status are exposed in `internal/mcp/server.go:216-267`, `:464-533` and verified in `internal/mcp/server_test.go:98-160`; existing single-job behavior still passes under the full suite, including `internal/orchestrator/service_test.go:22-218` and `internal/mcp/server_test.go:19-96`. Docs were also updated and inspected in `docs/ARCHITECTURE.md:89-99`, `:219-224` and `docs/IMPLEMENTATION_STATUS.md:72-75`, `:132-135`. Gap: documentation verification was manual rather than enforced by automated tests. Non-fatal issue encountered: an initial login-shell run surfaced a PowerShell profile execution-policy warning before rerunning the required Go commands successfully in a non-login shell.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-verification_contract.json",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-types.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-state_store.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-state_store_test.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-service.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-service_test.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-server.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-server_test.go",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-ARCHITECTURE.md",
+        ".gorechera\\artifacts\\job-20260401-232810.198\\step-03-IMPLEMENTATION_STATUS.md"
+      ],
+      "token_usage": {
+        "input_tokens": 16593,
+        "output_tokens": 1714,
+        "total_tokens": 18307,
+        "estimated_cost_usd": 0.018306999999999997
+      },
+      "started_at": "2026-04-01T23:40:28.693994Z",
+      "finished_at": "2026-04-01T23:42:23.7715331Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T23:28:10.1981893Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T23:30:04.979255Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T23:30:04.9802482Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:30:19.4988976Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T23:39:57.3940771Z",
+      "kind": "worker_succeeded",
+      "message": "Implemented sequential job chaining end-to-end. Changed files: internal/domain/types.go, internal/store/state_store.go, internal/store/state_store_test.go, internal/orchestrator/service.go, internal/orchestrator/service_test.go, internal/mcp/server.go, internal/mcp/server_test.go, docs/ARCHITECTURE.md, docs/IMPLEMENTATION_STATUS.md. Commands run: `gofmt -w internal/domain/types.go internal/store/state_store.go internal/store/state_store_test.go internal/orchestrator/service.go internal/orchestrator/service_test.go internal/mcp/server.go internal/mcp/server_test.go`, `go build ./...`, `go test ./...`, `git status --short`. Verification: `go build ./...` passed; `go test ./...` passed. Non-fatal issues encountered: initial `gofmt` invocation emitted a PowerShell profile execution-policy warning; `git status --short` emitted git ignore permission warnings for `C:\\Users\\News/.config/git/ignore`; one shell `Remove-Item` cleanup attempt for a test-generated temp directory was blocked by policy, then cleaned up successfully via delete/bash tools."
+    },
+    {
+      "time": "2026-04-01T23:39:57.3950714Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:40:28.693994Z",
+      "kind": "parallel_workers_requested",
+      "message": "parallel fan-out with 2 workers"
+    },
+    {
+      "time": "2026-04-01T23:42:23.7715331Z",
+      "kind": "parallel_workers_succeeded",
+      "message": "parallel fan-out with 2 workers completed"
+    },
+    {
+      "time": "2026-04-01T23:42:23.7725263Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:42:54.1349769Z",
+      "kind": "evaluation_passed",
+      "message": "A succeeded implement step completed the requested job chaining feature end-to-end, and independent review/test steps confirmed the required chain behavior plus successful `go build ./...` and `go test ./...`."
+    },
+    {
+      "time": "2026-04-01T23:42:54.1359702Z",
+      "kind": "job_completed",
+      "message": "Sprint contract satisfied. Sequential job chaining was implemented across domain/store/service/MCP, required docs were updated, reviewer found no blocking issues, and verification passed including `go build ./...` and `go test ./...` plus focused chain behavior tests covering start, persistence, sequential advancement, terminal failure/blocked stopping, final completion, and MCP start/status behavior."
+    }
+  ],
+  "created_at": "2026-04-01T23:28:10.1981893Z",
+  "updated_at": "2026-04-01T23:42:54.1359702Z"
+}

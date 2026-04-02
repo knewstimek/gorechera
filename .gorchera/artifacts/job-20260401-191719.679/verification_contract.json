@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "goal": "Add `Subtract(a, b int) int` to `main.go` and add a corresponding test in `main_test.go`.",
+  "summary": "Verify Inspect the existing Go files to confirm current structure, then update `main.go` to define `Subtract(a, b int) int` returning `a-b`. After that, add or extend `main_test.go` with a focused unit test that verifies the function returns the correct subtraction result. Finish by running the relevant Go test command to confirm the new function and test compile and pass without introducing unrelated changes. with required steps: implement, review, test",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-191719.679\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-191719.679\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-191719.679\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-191719.679\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement",
+    "review",
+    "test"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

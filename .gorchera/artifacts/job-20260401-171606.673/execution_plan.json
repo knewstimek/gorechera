@@ -1,0 +1,45 @@
+{
+  "goal": "Add a single-line comment to the top of README.md that says: gorechera orchestrator",
+  "tech_stack": "markdown",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Prepend a single line \"\u003c!-- gorechera orchestrator --\u003e\" (HTML comment, the standard comment syntax for Markdown) to the top of README.md in the workspace directory. This is a trivial file edit requiring one step.",
+  "product_scope": [
+    "Prepend a comment line to README.md"
+  ],
+  "non_goals": [
+    "Modify any other files",
+    "Change README.md content beyond adding the comment line"
+  ],
+  "proposed_steps": [
+    "Read current README.md to capture existing content",
+    "Prepend the line '\u003c!-- gorechera orchestrator --\u003e' as the first line of README.md",
+    "Verify the first line of README.md matches the expected comment"
+  ],
+  "success_signals": [
+    "First line of README.md reads \u003c!-- gorechera orchestrator --\u003e",
+    "File line count increased by exactly 1 compared to original"
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify README.md has the comment line prepended correctly",
+    "scope": [
+      "README.md"
+    ],
+    "required_commands": [
+      "head -1 README.md"
+    ],
+    "required_artifacts": [
+      "README.md"
+    ],
+    "required_checks": [
+      "First line of README.md is exactly: \u003c!-- gorechera orchestrator --\u003e",
+      "Original content of README.md is fully preserved after the first line"
+    ],
+    "disallowed_actions": [
+      "Modifying any file other than README.md",
+      "Deleting or reordering existing README.md content"
+    ],
+    "max_seconds": 60,
+    "owner_role": "tester"
+  }
+}

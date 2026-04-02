@@ -1,0 +1,72 @@
+{
+  "goal": "Add structured worker failure reasons so the supervisor receives machine-parseable error feedback for failed or blocked worker steps.",
+  "tech_stack": "Go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Update the domain model to carry a structured failure reason on steps, implement error classification in the orchestrator for worker failure and blocked paths, emit the structured reason as JSON in the corresponding events, and verify the change with repository build and test runs while keeping behavior aligned with existing orchestration principles.",
+  "product_scope": [
+    "Add `StructuredReason` to `internal/domain/types.go` and attach it to `Step` as an optional field.",
+    "Implement `classifyWorkerFailure(err error, workerOutput string) *StructuredReason` in `internal/orchestrator/service.go` using the specified pattern rules.",
+    "Populate `Step.StructuredReason` when worker execution ends in failure or blocked status.",
+    "Update `worker_failed` and `worker_blocked` event messages to include structured reason JSON.",
+    "Run `go build ./...` and `go test ./...` after the code changes.",
+    "Update relevant docs if current behavior or data shape documentation is affected by the change."
+  ],
+  "non_goals": [
+    "Changing supervisor logic beyond making the event payload easier to parse.",
+    "Introducing a broader error taxonomy than the requested categories and simple pattern classification.",
+    "Refactoring unrelated orchestrator state-machine behavior.",
+    "Changing evaluator gate semantics, approval handling, harness ownership, or worker spawning rules.",
+    "Adding Windows-specific behavior to core orchestration code."
+  ],
+  "proposed_steps": [
+    "Inspect `internal/domain/types.go` and `internal/orchestrator/service.go` to confirm current `Step` shape, worker result handling, and event emission points.",
+    "Add a `StructuredReason` struct with `Category`, `Detail`, and `SuggestedAction` fields, then add `StructuredReason *StructuredReason \\`json:\\\",omitempty\\\"\\`` to `Step`.",
+    "Implement `classifyWorkerFailure(err error, workerOutput string) *StructuredReason` in the orchestrator, using error unwrapping/string checks plus worker output text to detect build, test, file access, timeout, and schema violations.",
+    "Wire classification into worker failure and blocked handling so the current step captures the structured reason whenever classification succeeds.",
+    "Update `addEvent` calls for `worker_failed` and `worker_blocked` to embed the structured reason as JSON in the message while preserving enough human-readable context for logs.",
+    "Review whether any docs describing step/event payloads need adjustment and update them if necessary.",
+    "Run `go build ./...` and `go test ./...`, then fix any regressions caused by the new field or event formatting."
+  ],
+  "success_signals": [
+    "Repository builds and tests pass after the change.",
+    "Failure/blocking code paths now produce stable, parseable JSON reason content in events.",
+    "Step data can carry both legacy context and a structured classification for supervisor follow-up.",
+    "The implementation stays within existing orchestration constraints and does not alter unrelated workflow semantics."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that worker failure/blocking paths now generate structured, machine-parseable reasons on steps and in emitted events without breaking the Go project.",
+    "scope": [
+      "`internal/domain/types.go` data model changes",
+      "`internal/orchestrator/service.go` worker failure classification and event emission",
+      "Relevant docs if behavior or payload shape is documented",
+      "Repository-wide build and test verification"
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\domain\\types.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go"
+    ],
+    "required_checks": [
+      "Confirm `StructuredReason` exists with the requested fields.",
+      "Confirm `Step` has an optional structured reason field with `omitempty`.",
+      "Confirm `classifyWorkerFailure` detects build/compile, test, permission/access, context deadline, and JSON unmarshal cases.",
+      "Confirm worker failed/blocked event messages include structured reason JSON.",
+      "Confirm build and test commands pass."
+    ],
+    "disallowed_actions": [
+      "Do not bypass evaluator-gate semantics.",
+      "Do not pass full cross-agent conversation logs instead of artifact plus summary.",
+      "Do not introduce executor-driven worker spawning.",
+      "Do not auto-approve approval-gated work.",
+      "Do not mix global and job-scoped harness semantics.",
+      "Do not add Windows-only logic to core code."
+    ],
+    "max_seconds": 1200,
+    "notes": "Prefer minimal, localized changes and keep event formatting deterministic so the supervisor can parse it reliably.",
+    "owner_role": "executor"
+  }
+}

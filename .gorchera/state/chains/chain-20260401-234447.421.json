@@ -1,0 +1,27 @@
+{
+  "id": "chain-20260401-234447.421",
+  "goals": [
+    {
+      "goal": "Add model selection support to the Codex adapter. In internal/provider/codex.go, the runStructured method currently calls codex exec without a --model flag. Change it to accept the model name from the role profile and pass it as --model to codex exec. In internal/provider/provider.go or wherever RunLeader/RunWorker/RunPlanner/RunEvaluator are called, pass the role profile's Model field to the adapter. The adapter should only add --model if the model string is non-empty and not one of the Claude model names (opus/sonnet/haiku). Add a helper isCodexModel(model string) bool that returns true for GPT model names or empty string. Run go build ./... and go test ./... to verify.",
+      "provider": "codex",
+      "strictness_level": "normal",
+      "context_mode": "full",
+      "max_steps": 8,
+      "job_id": "job-20260401-234447.423",
+      "status": "done"
+    },
+    {
+      "goal": "Add artifact diff tracking to the orchestrator. After each worker step completes successfully, compute a simple diff of what changed in the workspace. In internal/orchestrator/service.go, after a worker step succeeds, run git diff --stat in the workspace directory (if it is a git repo) and store the result in a new field Step.DiffSummary string (add to internal/domain/types.go). If the workspace is not a git repo or git is not available, leave DiffSummary empty. This gives the supervisor visibility into what each worker actually changed. Run go build ./... and go test ./... to verify.",
+      "provider": "codex",
+      "strictness_level": "normal",
+      "context_mode": "full",
+      "max_steps": 8,
+      "job_id": "job-20260401-235019.337",
+      "status": "done"
+    }
+  ],
+  "current_index": 1,
+  "status": "done",
+  "created_at": "2026-04-01T23:44:47.4215458Z",
+  "updated_at": "2026-04-02T00:05:09.8840459Z"
+}

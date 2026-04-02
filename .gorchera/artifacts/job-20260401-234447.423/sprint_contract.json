@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Add model selection support to the Codex adapter. In internal/provider/codex.go, the runStructured method currently calls codex exec without a --model flag. Change it to accept the model name from the role profile and pass it as --model to codex exec. In internal/provider/provider.go or wherever RunLeader/RunWorker/RunPlanner/RunEvaluator are called, pass the role profile's Model field to the adapter. The adapter should only add --model if the model string is non-empty and not one of the Claude model names (opus/sonnet/haiku). Add a helper isCodexModel(model string) bool that returns true for GPT model names or empty string. Run go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

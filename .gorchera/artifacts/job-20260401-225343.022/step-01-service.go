@@ -1,0 +1,5 @@
+{
+  "next_recommended_action": "",
+  "status": "success",
+  "summary": "Implemented the summarize-cap fix in `D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go` by adding `consecutiveSummarizes`, incrementing it only on allowed `summarize` actions, resetting it on non-`summarize` actions, and forcing the existing `complete` path with event `leader_summarize_capped` on a third consecutive summarize so `evaluateCompletion()` still runs. Updated `D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go` to include the exact new leader prompt rule forbidding summarize abuse. Commands run: `go build ./...`, `go test ./...`, `git diff -- internal/orchestrator/service.go internal/provider/protocol.go`, `git status --short -- internal/orchestrator/service.go internal/provider/protocol.go`. Verification: `go build ./...` succeeded and `go test ./...` succeeded. Non-fatal issues encountered: the first login-shell `go build`/`go test` attempts emitted a PowerShell profile execution-policy warning, so both commands were rerun with `login=false`; `git status` also emitted `.config/git/ignore` permission warnings."
+}

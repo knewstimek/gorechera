@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "The function firstNonEmpty(vals ...string) string is duplicated in internal/orchestrator/service.go and internal/orchestrator/evaluator.go. Extract it into a new file internal/orchestrator/util.go, remove the duplicates from both files, and make sure all call sites still compile. Run go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

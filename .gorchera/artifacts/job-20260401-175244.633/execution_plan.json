@@ -1,0 +1,63 @@
+{
+  "goal": "Create a Go CLI tool (tempconv) that converts temperatures between Celsius and Fahrenheit using -c/-f flags, with unit tests.",
+  "tech_stack": "Go, standard library (flag, fmt, math, testing)",
+  "workspace_dir": "D:/News/Business/sandbox-test",
+  "summary": "Build a single-file Go CLI tool in D:/News/Business/sandbox-test. Initialize the module with `go mod init tempconv`, implement main.go with flag parsing (-c for Celsius input, -f for Fahrenheit input) and conversion logic, then create main_test.go with table-driven tests covering normal values, edge cases (0, negative, absolute zero), and error cases. The program reads a numeric value and a unit flag, applies the appropriate formula (C-\u003eF: C*9/5+32, F-\u003eC: (F-32)*5/9), and prints the result.",
+  "product_scope": [
+    "CLI flag parsing: -c (Celsius to Fahrenheit) and -f (Fahrenheit to Celsius)",
+    "Temperature conversion with standard formulas",
+    "Formatted output of converted value",
+    "Unit tests in main_test.go with table-driven tests"
+  ],
+  "non_goals": [
+    "GUI or web interface",
+    "Kelvin or other temperature scales",
+    "Interactive/REPL mode",
+    "Configuration files"
+  ],
+  "proposed_steps": [
+    "Step 1: Run `go mod init tempconv` in the workspace directory to initialize the Go module",
+    "Step 2: Create main.go with: (a) conversion functions CtoF and FtoC, (b) flag parsing for -c and -f flags accepting float64, (c) main function that validates exactly one flag is provided, converts, and prints result",
+    "Step 3: Create main_test.go with table-driven tests for CtoF and FtoC functions covering: 0C=32F, 100C=212F, -40C=-40F, 32F=0C, 212F=100C, negative values",
+    "Step 4: Run `go build` to verify compilation",
+    "Step 5: Run `go test -v` to verify all tests pass"
+  ],
+  "success_signals": [
+    "go build produces tempconv.exe without errors",
+    "go test -v shows all PASS",
+    "Manual run with -c 100 outputs 212",
+    "Manual run with -f 32 outputs 0"
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify the tempconv CLI tool builds, runs correctly, and passes all unit tests",
+    "scope": [
+      "main.go",
+      "main_test.go",
+      "go.mod"
+    ],
+    "required_commands": [
+      "cd D:/News/Business/sandbox-test \u0026\u0026 go build -o tempconv.exe",
+      "cd D:/News/Business/sandbox-test \u0026\u0026 go test -v"
+    ],
+    "required_artifacts": [
+      "D:/News/Business/sandbox-test/go.mod",
+      "D:/News/Business/sandbox-test/main.go",
+      "D:/News/Business/sandbox-test/main_test.go"
+    ],
+    "required_checks": [
+      "go test -v shows all tests PASS with 0 failures",
+      "tempconv.exe -c 100 outputs a value equal to 212",
+      "tempconv.exe -f 32 outputs a value equal to 0",
+      "tempconv.exe -c -40 outputs -40 (invariant point)",
+      "Running with no flags or both flags produces an error message"
+    ],
+    "disallowed_actions": [
+      "Do not use external dependencies beyond Go standard library",
+      "Do not modify files outside the workspace directory"
+    ],
+    "max_seconds": 120,
+    "notes": "Conversion functions should be exported (CtoF, FtoC) so tests can call them directly. Output format should use reasonable precision (e.g., %.2f).",
+    "owner_role": "tester"
+  }
+}

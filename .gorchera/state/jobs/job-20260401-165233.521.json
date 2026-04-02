@@ -1,0 +1,47 @@
+{
+  "id": "job-20260401-165233.521",
+  "goal": "List files",
+  "tech_stack": "go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "role_profiles": {
+    "planner": {
+      "provider": "claude"
+    },
+    "leader": {
+      "provider": "claude"
+    },
+    "executor": {
+      "provider": "claude"
+    },
+    "reviewer": {
+      "provider": "claude"
+    },
+    "tester": {
+      "provider": "claude"
+    },
+    "evaluator": {
+      "provider": "claude"
+    }
+  },
+  "status": "failed",
+  "provider": "claude",
+  "max_steps": 8,
+  "current_step": 0,
+  "retry_count": 0,
+  "failure_reason": "planner execution failed: claude provider command_failed (claude): provider command failed | unwrap: exit status 1: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":24,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Not logged in · Please run /login\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"392d6b34-4983-4083-a682-b7e65057363f\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"fast_mode_state\":\"off\",\"uuid\":\"77a52dc1-1f71-4d5e-84ed-7184de1066bd\"}\n",
+  "leader_context_summary": "Goal: List files",
+  "events": [
+    {
+      "time": "2026-04-01T16:52:33.521768Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T16:52:34.5135046Z",
+      "kind": "job_failed",
+      "message": "planner execution failed: claude provider command_failed (claude): provider command failed | unwrap: exit status 1: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":24,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Not logged in · Please run /login\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"392d6b34-4983-4083-a682-b7e65057363f\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"fast_mode_state\":\"off\",\"uuid\":\"77a52dc1-1f71-4d5e-84ed-7184de1066bd\"}\n"
+    }
+  ],
+  "created_at": "2026-04-01T16:52:33.521768Z",
+  "updated_at": "2026-04-01T16:52:34.5135046Z"
+}

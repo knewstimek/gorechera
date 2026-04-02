@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "passed": true,
+  "score": 96,
+  "reason": "The job state includes a succeeded implement step that directly covers the requested structured failure feedback changes and reports successful build/test verification.",
+  "evidence": [
+    "B:implement",
+    "Step 1 has task_type=\"implement\" and status=\"succeeded\".",
+    "Step 1 summary states `StructuredReason` and optional `Step.StructuredReason` were added in `internal/domain/types.go`.",
+    "Step 1 summary states `internal/orchestrator/service.go` now classifies worker failure/blocked paths and emits deterministic JSON in `worker_failed` and `worker_blocked` events.",
+    "Step 1 summary reports `go build ./...` and `go test ./...` both succeeded.",
+    "Step 1 artifacts include `.gorechera\\artifacts\\job-20260401-223111.915\\step-01-types.go` and `.gorechera\\artifacts\\job-20260401-223111.915\\step-01-service.go`."
+  ],
+  "contract_ref": ".gorechera\\artifacts\\job-20260401-223111.915\\verification_contract.json"
+}

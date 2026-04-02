@@ -1,0 +1,80 @@
+{
+  "goal": "Fix the 5 audited medium-severity defects in orchestrator state handling, worker-failure classification, context payload generation, UTF-8-safe summary truncation, and parallel worker failure flow, then verify with Go build and tests.",
+  "tech_stack": "Go 1.26, stdlib, Gorechera orchestrator/provider packages",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Update the existing orchestrator and provider code paths only where the audit identified behavioral defects: make summarize honor completion retry cleanup and persistence semantics, broaden schema-violation detection for worker failures, correct minimal-context step counters and UTF-8-safe summary truncation, and align parallel worker failure handling with the single-worker path so failed workers return control to the leader instead of failing the whole job. Add or extend focused regression tests for each fix, update the implementation-status documentation to reflect the resolved findings and any behavior notes, then run the required Go build and test commands.",
+  "product_scope": [
+    "`internal/orchestrator/service.go` completion-retry summarize behavior and worker-failure classification",
+    "`internal/provider/protocol.go` minimal and summary context payload correctness",
+    "`internal/orchestrator/parallel.go` parallel worker failure state transition behavior",
+    "Regression coverage in existing orchestrator/provider test files",
+    "Documentation updates for the resolved audit findings"
+  ],
+  "non_goals": [
+    "No new orchestrator actions, statuses, or features",
+    "No changes to approval semantics, evaluator gate rules, or provider interfaces beyond the requested fixes",
+    "No broad refactor of run loop, payload builders, or parallel execution architecture",
+    "No unrelated bug fixes outside the 5 listed audit findings"
+  ],
+  "proposed_steps": [
+    "Inspect the current implementations around `runLoop`, `classifyWorkerFailure`, `buildMinimalPayload`, `buildSummaryPayload`, and `runParallelWorkerPlans` to confirm exact existing behavior and nearby test coverage.",
+    "Patch `internal/orchestrator/service.go` so the `summarize` action clears `job.BlockedReason` when `completionRetryPending` is active, and so the early `complete` return with no new steps performs `s.touch(job)` and `s.state.SaveJob(...)` before returning.",
+    "Expand `classifyWorkerFailure` in `internal/orchestrator/service.go` to classify field-level validator output as schema violations when messages contain `is required`, `invalid`, or `validation failed`, while preserving existing timeout, file-access, test, and build classification precedence.",
+    "Patch `internal/provider/protocol.go` so minimal mode counts `active`, `blocked`, and `failed` separately, counting only empty-status or `active` steps as active, and so summary-mode truncation uses rune-based slicing before appending ellipsis.",
+    "Patch `internal/orchestrator/parallel.go` so a parallel worker result with status `failed` marks that step failed, records failure context for the leader, and leaves the job in a leader-resumable state instead of escalating the whole job to `failed`; keep blocked behavior unchanged.",
+    "Add focused regression tests covering: summarize-after-completion-retry persistence, broader schema-failure detection, minimal payload blocked counting, UTF-8-safe summary truncation, and parallel failed-worker control returning to the leader.",
+    "Run `gofmt` on modified Go files, update `docs/IMPLEMENTATION_STATUS.md` and any behavior-facing architecture note needed by the changed state flow, then run `go build ./...` and `go test ./...`."
+  ],
+  "success_signals": [
+    "A job that hits the completion-retry summarize path no longer retains a stale `BlockedReason`, and the blocked early-return path persists updated timestamps/state.",
+    "Schema-validator error strings from `internal/schema/validate.go` are categorized as `schema_violation` without relying only on top-level schema/unmarshal wording.",
+    "Minimal context payloads show distinct `blocked_steps`, `failed_steps`, and `active_steps` values consistent with actual step statuses.",
+    "Summary payload generation remains valid for Korean or other multibyte summaries when truncation occurs.",
+    "Parallel fan-out with a worker-level `failed` result leaves the job recoverable by the leader rather than terminating the entire job as failed.",
+    "Both `go build ./...` and `go test ./...` pass in `D:\\News\\Business\\AIOrchestrator`."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that the 5 requested audit fixes were implemented exactly, documented, and validated by build and tests.",
+    "scope": [
+      "`internal/orchestrator/service.go`",
+      "`internal/provider/protocol.go`",
+      "`internal/orchestrator/parallel.go`",
+      "relevant orchestrator/provider regression tests",
+      "documentation updates for resolved findings"
+    ],
+    "required_commands": [
+      "gofmt -w internal/orchestrator/service.go internal/orchestrator/parallel.go internal/provider/protocol.go \u003cmodified_test_files\u003e",
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\parallel.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service_test.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\provider_test.go",
+      "D:\\News\\Business\\AIOrchestrator\\docs\\IMPLEMENTATION_STATUS.md"
+    ],
+    "required_checks": [
+      "Confirm summarize clears stale blocked reason during completion retry and that the no-new-steps complete retry return persists touched state.",
+      "Confirm schema-failure classification covers validator-style text such as `is required`, `invalid`, and `validation failed`.",
+      "Confirm minimal payload counting distinguishes active, blocked, and failed correctly.",
+      "Confirm summary truncation is rune-safe for multibyte UTF-8 text.",
+      "Confirm parallel worker status `failed` marks the step failed but does not fail the overall job immediately.",
+      "Confirm documentation mentions the resolved audit findings or adjusted behavior.",
+      "Confirm `go build ./...` and `go test ./...` both succeed."
+    ],
+    "disallowed_actions": [
+      "Adding new product features",
+      "Changing evaluator gate semantics beyond the requested persistence cleanup",
+      "Escalating parallel worker `failed` status to whole-job failure",
+      "Broad refactors unrelated to the 5 findings",
+      "Skipping documentation update",
+      "Skipping build or test verification"
+    ],
+    "max_seconds": 1800,
+    "notes": "Prefer focused regression tests near the existing orchestrator/provider test suites. Keep behavior aligned with existing single-worker semantics and existing state-save patterns.",
+    "owner_role": "tester"
+  }
+}

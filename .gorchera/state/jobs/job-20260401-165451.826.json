@@ -1,0 +1,100 @@
+{
+  "id": "job-20260401-165451.826",
+  "goal": "List the files in the current directory and summarize the project structure",
+  "tech_stack": "go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "role_profiles": {
+    "planner": {
+      "provider": "claude"
+    },
+    "leader": {
+      "provider": "claude"
+    },
+    "executor": {
+      "provider": "claude"
+    },
+    "reviewer": {
+      "provider": "claude"
+    },
+    "tester": {
+      "provider": "claude"
+    },
+    "evaluator": {
+      "provider": "claude"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that the file listing is complete and the project summary is accurate",
+    "scope": [
+      "Root directory listing completeness",
+      "Recursive file tree accuracy",
+      "Summary correctness against actual structure"
+    ],
+    "required_commands": [
+      "ls D:/News/Business/AIOrchestrator",
+      "find D:/News/Business/AIOrchestrator -type f | wc -l"
+    ],
+    "required_artifacts": [
+      "file_tree_listing",
+      "project_structure_summary",
+      ".gorechera\\artifacts\\job-20260401-165451.826\\verification_contract.json"
+    ],
+    "required_checks": [
+      "All top-level entries present: AGENTS.md, CLAUDE.md, README.md, Old/, cmd/, docs/, examples/, go.mod, gorechera.exe, internal/",
+      "Go source count matches (~30 files)",
+      "Summary mentions all 8 internal packages: api, domain, orchestrator, policy, provider, runtime, schema, store",
+      "No files were modified (git status clean or no changes)"
+    ],
+    "disallowed_actions": [
+      "File creation",
+      "File modification",
+      "File deletion",
+      "go build",
+      "go test"
+    ],
+    "max_seconds": 60,
+    "notes": "Pure read-only task. Verification should confirm listing completeness by cross-checking with independent directory enumeration.",
+    "owner_role": "tester"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-165451.826\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-165451.826\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-165451.826\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-165451.826\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-165451.826\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-165451.826\\sprint_contract.json",
+  "status": "failed",
+  "provider": "claude",
+  "max_steps": 8,
+  "current_step": 0,
+  "retry_count": 0,
+  "failure_reason": "leader schema validation failed: run_system requires SYS target",
+  "summary": "Gorechera is a Go-based stateful multi-agent orchestration engine. The project follows standard Go layout: cmd/ for CLI entry point, internal/ for core packages (api, domain, orchestrator, policy, provider, runtime, schema, store), docs/ for architecture and design documents, and examples/ for sample configs. The codebase contains ~30 Go source files across 8 internal packages, with a prebuilt gorechera.exe binary at root. This is a read-only reconnaissance task requiring directory listing and file enumeration only.",
+  "leader_context_summary": "Gorechera is a Go-based stateful multi-agent orchestration engine. The project follows standard Go layout: cmd/ for CLI entry point, internal/ for core packages (api, domain, orchestrator, policy, provider, runtime, schema, store), docs/ for architecture and design documents, and examples/ for sample configs. The codebase contains ~30 Go source files across 8 internal packages, with a prebuilt gorechera.exe binary at root. This is a read-only reconnaissance task requiring directory listing and file enumeration only.",
+  "events": [
+    {
+      "time": "2026-04-01T16:54:51.826137Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T16:55:54.3792803Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T16:55:54.3811977Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T16:56:05.2405244Z",
+      "kind": "job_failed",
+      "message": "leader schema validation failed: run_system requires SYS target"
+    }
+  ],
+  "created_at": "2026-04-01T16:54:51.826137Z",
+  "updated_at": "2026-04-01T16:56:05.2405244Z"
+}

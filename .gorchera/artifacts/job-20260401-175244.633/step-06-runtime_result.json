@@ -1,0 +1,16 @@
+{
+  "category": "command",
+  "command": "go",
+  "args": [
+    "test",
+    "-v"
+  ],
+  "exit_code": 0,
+  "stdout": "=== RUN   TestCtoF\n--- PASS: TestCtoF (0.00s)\n=== RUN   TestFtoC\n--- PASS: TestFtoC (0.00s)\nPASS\nok  \ttempconv\t0.385s\n",
+  "started_at": "2026-04-01T17:56:39.5926321Z",
+  "finished_at": "2026-04-01T17:56:40.4369266Z",
+  "duration": 844294500,
+  "timed_out": false,
+  "truncated_stdout": false,
+  "truncated_stderr": false
+}

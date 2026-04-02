@@ -1,0 +1,119 @@
+{
+  "id": "job-20260401-133115.208",
+  "goal": "Test system-action-ready MVP",
+  "tech_stack": "go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "status": "done",
+  "provider": "mock",
+  "max_steps": 8,
+  "current_step": 3,
+  "retry_count": 0,
+  "summary": "mock provider completed implement, review, and test phases",
+  "leader_context_summary": "test completed for goal \"Test system-action-ready MVP\"",
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Create the initial orchestrator implementation skeleton.",
+      "status": "succeeded",
+      "summary": "implement completed for goal \"Test system-action-ready MVP\"",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-133115.208\\step-01-patch.diff",
+        ".gorechera\\artifacts\\job-20260401-133115.208\\step-01-implementation_notes.md"
+      ],
+      "started_at": "2026-04-01T13:31:15.212135Z",
+      "finished_at": "2026-04-01T13:31:15.2166052Z"
+    },
+    {
+      "index": 2,
+      "target": "C",
+      "task_type": "review",
+      "task_text": "Review the implementation artifacts for regressions and protocol issues.",
+      "status": "succeeded",
+      "summary": "review completed for goal \"Test system-action-ready MVP\"",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-133115.208\\step-02-review_report.json"
+      ],
+      "started_at": "2026-04-01T13:31:15.2200818Z",
+      "finished_at": "2026-04-01T13:31:15.2225647Z"
+    },
+    {
+      "index": 3,
+      "target": "D",
+      "task_type": "test",
+      "task_text": "Run the designated validation checks and summarize the result.",
+      "status": "succeeded",
+      "summary": "test completed for goal \"Test system-action-ready MVP\"",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-133115.208\\step-03-test_report.json"
+      ],
+      "started_at": "2026-04-01T13:31:15.2250484Z",
+      "finished_at": "2026-04-01T13:31:15.2275317Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T13:31:15.2091549Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T13:31:15.2106451Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T13:31:15.212135Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T13:31:15.2171018Z",
+      "kind": "worker_succeeded",
+      "message": "implement completed for goal \"Test system-action-ready MVP\""
+    },
+    {
+      "time": "2026-04-01T13:31:15.2185918Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T13:31:15.2200818Z",
+      "kind": "worker_requested",
+      "message": "C:review"
+    },
+    {
+      "time": "2026-04-01T13:31:15.2225647Z",
+      "kind": "worker_succeeded",
+      "message": "review completed for goal \"Test system-action-ready MVP\""
+    },
+    {
+      "time": "2026-04-01T13:31:15.2240549Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T13:31:15.2250484Z",
+      "kind": "worker_requested",
+      "message": "D:test"
+    },
+    {
+      "time": "2026-04-01T13:31:15.2275317Z",
+      "kind": "worker_succeeded",
+      "message": "test completed for goal \"Test system-action-ready MVP\""
+    },
+    {
+      "time": "2026-04-01T13:31:15.228525Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T13:31:15.2300147Z",
+      "kind": "job_completed",
+      "message": "mock provider completed implement, review, and test phases"
+    }
+  ],
+  "created_at": "2026-04-01T13:31:15.2086581Z",
+  "updated_at": "2026-04-01T13:31:15.2300147Z"
+}

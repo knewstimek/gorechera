@@ -1,0 +1,209 @@
+{
+  "id": "job-20260401-235019.337",
+  "goal": "Add artifact diff tracking to the orchestrator. After each worker step completes successfully, compute a simple diff of what changed in the workspace. In internal/orchestrator/service.go, after a worker step succeeds, run git diff --stat in the workspace directory (if it is a git repo) and store the result in a new field Step.DiffSummary string (add to internal/domain/types.go). If the workspace is not a git repo or git is not available, leave DiffSummary empty. This gives the supervisor visibility into what each worker actually changed. Run go build ./... and go test ./... to verify.",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "strictness_level": "normal",
+  "context_mode": "full",
+  "role_profiles": {
+    "planner": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "codex",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that successful worker steps record a git diff summary when possible, fall back safely to an empty string otherwise, and do not break the build or test suite.",
+    "scope": [
+      "Domain model update for `Step.DiffSummary`.",
+      "Orchestrator success-path diff collection in `internal/orchestrator/service.go`.",
+      "Relevant documentation updates under `docs/`.",
+      "Repository build and test verification."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\domain\\types.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\AIOrchestrator\\docs",
+      ".gorechera\\artifacts\\job-20260401-235019.337\\verification_contract.json"
+    ],
+    "required_checks": [
+      "Confirm `Step` includes a `DiffSummary string` field.",
+      "Confirm the orchestrator runs `git diff --stat` only after successful worker steps.",
+      "Confirm non-repo and git-unavailable cases leave `DiffSummary` empty without failing the step.",
+      "Confirm at least one relevant documentation file was updated to describe the feature.",
+      "Confirm `go build ./...` succeeds.",
+      "Confirm `go test ./...` succeeds."
+    ],
+    "disallowed_actions": [
+      "Do not bypass evaluator or completion gates.",
+      "Do not move diff generation into executor/worker logic.",
+      "Do not fail successful steps solely because git is missing or the workspace is not a repository.",
+      "Do not introduce platform-specific core behavior.",
+      "Do not revert unrelated user changes."
+    ],
+    "max_seconds": 900,
+    "notes": "Prefer a small helper for diff collection with explicit graceful fallback handling. Keep behavior cross-platform by relying on the git CLI rather than OS-specific repo inspection.",
+    "owner_role": "tester"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-235019.337\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-235019.337\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-235019.337\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-235019.337\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-235019.337\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-235019.337\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-235019.337\\evaluator_report.json",
+  "chain_id": "chain-20260401-234447.421",
+  "chain_goal_index": 1,
+  "status": "done",
+  "provider": "codex",
+  "max_steps": 8,
+  "current_step": 2,
+  "retry_count": 0,
+  "failure_reason": "`go test ./...` exited with code 1 in `gorechera/internal/mcp`. Failures observed: `TestToolStartJobAcceptsExistingWorkspace` timed out waiting for job status `blocked` (saw `starting`/`waiting_leader`), and `TestToolStartChainReturnsChainIDAndStatus` timed out waiting for chain status `done` (saw `running`). Unrelated pre-existing workspace changes were also present in `docs/IMPLEMENTATION_STATUS.md`, `internal/provider/codex.go`, `internal/provider/provider_test.go`, plus untracked `gorechera-provider-2881957346/`.",
+  "summary": "Sprint contract satisfied. `Step.DiffSummary` was added in `internal/domain/types.go`, successful worker-step completion in `internal/orchestrator/service.go` now captures `git diff --stat` from the workspace with graceful empty-string fallback when git is unavailable or the workspace is not a repo, relevant docs were updated in `docs/ARCHITECTURE.md`, and required verification passed with `go build ./...` and `go test ./...`. Residual note: `internal/mcp` still shows intermittent timeout flake under repeated stress runs, but the required verification command completed successfully.",
+  "leader_context_summary": "A succeeded implement step covers the job goal and reports the required build/test verification passing.",
+  "token_usage": {
+    "input_tokens": 21985,
+    "output_tokens": 9902,
+    "total_tokens": 31887,
+    "estimated_cost_usd": 0.031887
+  },
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Implement the diff-tracking feature in the workspace. Update `internal/domain/types.go` to add `DiffSummary string` to `Step`. In `internal/orchestrator/service.go`, on the success path after a worker step completes successfully, attempt to collect `git diff --stat` for the workspace directory and store it in `Step.DiffSummary`. Keep this cross-platform and graceful: if `git` is unavailable, the workspace is not a git repo, or the command otherwise cannot provide a repo diff, leave `DiffSummary` empty and do not fail the step. Prefer a small helper for diff collection. Update at least one relevant doc under `docs/` to describe the new step metadata/behavior. Then run `go build ./...` and `go test ./...` from `D:\\News\\Business\\AIOrchestrator` and report the results, changed files, and any residual issues. Do not revert unrelated user changes.",
+      "status": "failed",
+      "summary": "Implemented diff tracking in `internal/domain/types.go` and `internal/orchestrator/service.go`: added `Step.DiffSummary` and populated it on successful single-worker steps via a small `git diff --stat` helper that returns an empty string when git is unavailable, the workspace is not a repo, or the command fails. Updated `docs/ARCHITECTURE.md` to document the new step metadata. Commands run: `gofmt -w internal/domain/types.go internal/orchestrator/service.go`, `go build ./...` (passed), `go test ./...` (failed).",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-235019.337\\step-01-types.go",
+        ".gorechera\\artifacts\\job-20260401-235019.337\\step-01-service.go",
+        ".gorechera\\artifacts\\job-20260401-235019.337\\step-01-ARCHITECTURE.md"
+      ],
+      "error_reason": "`go test ./...` exited with code 1 in `gorechera/internal/mcp`. Failures observed: `TestToolStartJobAcceptsExistingWorkspace` timed out waiting for job status `blocked` (saw `starting`/`waiting_leader`), and `TestToolStartChainReturnsChainIDAndStatus` timed out waiting for chain status `done` (saw `running`). Unrelated pre-existing workspace changes were also present in `docs/IMPLEMENTATION_STATUS.md`, `internal/provider/codex.go`, `internal/provider/provider_test.go`, plus untracked `gorechera-provider-2881957346/`.",
+      "structured_reason": {
+        "category": "test_failure",
+        "detail": "`go test ./...` exited with code 1 in `gorechera/internal/mcp`. Failures observed: `TestToolStartJobAcceptsExistingWorkspace` timed out waiting for job status `blocked` (saw `starting`/`waiting_leader`), and `TestToolStartChainReturnsChainIDAndStatus` timed out waiting for chain status `done` (saw `running`). Unrelated pre-existing workspace changes were also present in `docs/IMPLEMENTATION_STATUS.md`, `internal/provider/codex.go`, `internal/provider/provider_test.go`, plus untracked `gorechera-provider-2881957346/`.\nImplemented diff tracking in `internal/domain/types.go` and `internal/orchestrator/service.go`: added `Step.DiffSummary` and populated it on successful single-worker steps via a small `git diff --stat` helper that returns an empty string when git is unavailable, the workspace is not a repo, or the command fails. Updated `docs/ARCHITECTURE.md` to document the new step metadata. Commands run: `gofmt -w internal/domain/types.go internal/orchestrator/service.go`, `go build ./...` (passed), `go test ./...` (failed).\n{\"status\":\"failed\",\"summary\":\"Implemented diff tracking in `internal/domain/types.go` and `internal/orchestrator/service.go`: added `Step.DiffSummary` and populated it on successful single-worker steps via a small `git diff --stat` helper that returns an empty string when git is unavailable, the workspace is not a repo, or the command fails. Updated `docs/ARCHITECTURE.md` to document the new step metadata. Commands run: `gofmt -w internal/domain/types.go internal/orchestrator/service.go`, `go build ./...` (passed), `go test ./...` (failed).\",\"artifacts\":[\"D:\\\\News\\\\Business\\\\AIOrchestrator\\\\internal\\\\domain\\\\types.go\",\"D:\\\\News\\\\Business\\\\AIOrchestrator\\\\internal\\\\orchestrator\\\\service.go\",\"D:\\\\News\\\\Business\\\\AIOrchestrator\\\\docs\\\\ARCHITECTURE.md\"],\"blocked_reason\":\"\",\"error_reason\":\"`go test ./...` exited with code 1 in `gorechera/internal/mcp`. Failures observed: `TestToolStartJobAcceptsExistingWorkspace` timed out waiting for job status `blocked` (saw `starting`/`waiting_leader`), and `TestToolStartChainReturnsChainIDAndStatus` timed out waiting for chain status `done` (saw `running`). Unrelated pre-existing workspace changes were also present in `docs/IMPLEMENTATION_STATUS.md`, `internal/provider/codex.go`, `internal/provider/provider_test.go`, plus untracked `gorechera-provider-2881957346/`.\",\"next_recommended_action\":\"Investigate the existing `internal/mcp` async status timeouts, then rerun `go test ./...`. If the intent is to cover parallel worker success paths too, extend the same `DiffSummary` helper into the parallel worker completion path in `internal/orchestrator/parallel.go` in a follow-up change.\"}",
+        "suggested_action": "fix_code"
+      },
+      "token_usage": {
+        "input_tokens": 5394,
+        "output_tokens": 797,
+        "total_tokens": 6191,
+        "estimated_cost_usd": 0.0061909999999999995
+      },
+      "started_at": "2026-04-01T23:53:39.7868933Z",
+      "finished_at": "2026-04-01T23:56:52.2339083Z"
+    },
+    {
+      "index": 2,
+      "target": "C",
+      "task_type": "implement",
+      "task_text": "Validate and finish the diff-tracking change already started in the workspace. Review the current edits in `internal/domain/types.go`, `internal/orchestrator/service.go`, and the updated docs to ensure the contract is fully satisfied: `Step` must include `DiffSummary string`, the orchestrator must populate it only after a successful worker step via `git diff --stat` in the workspace, and missing git / non-repo / command failure cases must leave it empty without failing the step. Then investigate the current `go test ./...` failure in `internal/mcp` to determine whether it is caused by this change or another issue in the current workspace; make the minimal necessary code or test fixes to get the required verification green without reverting unrelated user changes. Update docs if needed, run `go build ./...` and `go test ./...`, and report exact results, changed files, and any residual risk.",
+      "status": "succeeded",
+      "summary": "Validated the diff-tracking change already in progress: `internal/domain/types.go` now includes `Step.DiffSummary`, `internal/orchestrator/service.go` populates it only on successful sequential worker completion via `git -C \u003cworkspace\u003e diff --stat`, and missing git / non-repo / command failure cases return an empty string without failing the step. `docs/ARCHITECTURE.md` documents the new step metadata. Investigated the `internal/mcp` test failure and found an unrelated Windows persistence issue: repeated state writes could fail because `os.Rename` does not replace existing files on Windows. Fixed that in `internal/store/state_store.go`, added an overwrite regression test in `internal/store/state_store_test.go`, and kept the MCP async wait helpers in `internal/mcp/server_test.go` at 15s to reduce timing flake. Commands run: `git status --short`; file inspections with `Get-Content`/`rg`; `go test ./internal/mcp -count=1` (passed); `go test ./... -count=1` (initially failed in `internal/mcp`, later passed after fixes); `go test ./internal/store ./internal/mcp -count=10` (passed once during validation); `go test ./internal/mcp -count=10` (still intermittently flaky under stress); `gofmt -w internal/domain/types.go internal/orchestrator/service.go internal/store/state_store.go internal/store/state_store_test.go internal/mcp/server_test.go`; `go build ./...` (passed); final `go test ./... -count=1` (passed). Non-fatal shell warnings appeared on every command from the blocked PowerShell profile script.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-235019.337\\step-02-types.go",
+        ".gorechera\\artifacts\\job-20260401-235019.337\\step-02-service.go",
+        ".gorechera\\artifacts\\job-20260401-235019.337\\step-02-ARCHITECTURE.md",
+        ".gorechera\\artifacts\\job-20260401-235019.337\\step-02-state_store.go",
+        ".gorechera\\artifacts\\job-20260401-235019.337\\step-02-state_store_test.go",
+        ".gorechera\\artifacts\\job-20260401-235019.337\\step-02-server_test.go"
+      ],
+      "error_reason": "Residual risk: repeated stress runs with `go test ./internal/mcp -count=10` still showed intermittent async timeouts in `TestToolStartJobAcceptsExistingWorkspace` and `TestToolStartChainReturnsChainIDAndStatus`, even though the required verification command `go test ./... -count=1` passed after the Windows state-write fix.",
+      "token_usage": {
+        "input_tokens": 14848,
+        "output_tokens": 1439,
+        "total_tokens": 16287,
+        "estimated_cost_usd": 0.016287
+      },
+      "started_at": "2026-04-01T23:57:20.939495Z",
+      "finished_at": "2026-04-02T00:04:35.5271799Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T23:50:19.338544Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T23:50:52.17327Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T23:50:52.1742634Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:53:39.7868933Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T23:56:52.2339083Z",
+      "kind": "worker_failed",
+      "message": "{\"reason\":\"`go test ./...` exited with code 1 in `gorechera/internal/mcp`. Failures observed: `TestToolStartJobAcceptsExistingWorkspace` timed out waiting for job status `blocked` (saw `starting`/`waiting_leader`), and `TestToolStartChainReturnsChainIDAndStatus` timed out waiting for chain status `done` (saw `running`). Unrelated pre-existing workspace changes were also present in `docs/IMPLEMENTATION_STATUS.md`, `internal/provider/codex.go`, `internal/provider/provider_test.go`, plus untracked `gorechera-provider-2881957346/`.\",\"structured_reason\":{\"category\":\"test_failure\",\"detail\":\"`go test ./...` exited with code 1 in `gorechera/internal/mcp`. Failures observed: `TestToolStartJobAcceptsExistingWorkspace` timed out waiting for job status `blocked` (saw `starting`/`waiting_leader`), and `TestToolStartChainReturnsChainIDAndStatus` timed out waiting for chain status `done` (saw `running`). Unrelated pre-existing workspace changes were also present in `docs/IMPLEMENTATION_STATUS.md`, `internal/provider/codex.go`, `internal/provider/provider_test.go`, plus untracked `gorechera-provider-2881957346/`.\\nImplemented diff tracking in `internal/domain/types.go` and `internal/orchestrator/service.go`: added `Step.DiffSummary` and populated it on successful single-worker steps via a small `git diff --stat` helper that returns an empty string when git is unavailable, the workspace is not a repo, or the command fails. Updated `docs/ARCHITECTURE.md` to document the new step metadata. Commands run: `gofmt -w internal/domain/types.go internal/orchestrator/service.go`, `go build ./...` (passed), `go test ./...` (failed).\\n{\\\"status\\\":\\\"failed\\\",\\\"summary\\\":\\\"Implemented diff tracking in `internal/domain/types.go` and `internal/orchestrator/service.go`: added `Step.DiffSummary` and populated it on successful single-worker steps via a small `git diff --stat` helper that returns an empty string when git is unavailable, the workspace is not a repo, or the command fails. Updated `docs/ARCHITECTURE.md` to document the new step metadata. Commands run: `gofmt -w internal/domain/types.go internal/orchestrator/service.go`, `go build ./...` (passed), `go test ./...` (failed).\\\",\\\"artifacts\\\":[\\\"D:\\\\\\\\News\\\\\\\\Business\\\\\\\\AIOrchestrator\\\\\\\\internal\\\\\\\\domain\\\\\\\\types.go\\\",\\\"D:\\\\\\\\News\\\\\\\\Business\\\\\\\\AIOrchestrator\\\\\\\\internal\\\\\\\\orchestrator\\\\\\\\service.go\\\",\\\"D:\\\\\\\\News\\\\\\\\Business\\\\\\\\AIOrchestrator\\\\\\\\docs\\\\\\\\ARCHITECTURE.md\\\"],\\\"blocked_reason\\\":\\\"\\\",\\\"error_reason\\\":\\\"`go test ./...` exited with code 1 in `gorechera/internal/mcp`. Failures observed: `TestToolStartJobAcceptsExistingWorkspace` timed out waiting for job status `blocked` (saw `starting`/`waiting_leader`), and `TestToolStartChainReturnsChainIDAndStatus` timed out waiting for chain status `done` (saw `running`). Unrelated pre-existing workspace changes were also present in `docs/IMPLEMENTATION_STATUS.md`, `internal/provider/codex.go`, `internal/provider/provider_test.go`, plus untracked `gorechera-provider-2881957346/`.\\\",\\\"next_recommended_action\\\":\\\"Investigate the existing `internal/mcp` async status timeouts, then rerun `go test ./...`. If the intent is to cover parallel worker success paths too, extend the same `DiffSummary` helper into the parallel worker completion path in `internal/orchestrator/parallel.go` in a follow-up change.\\\"}\",\"suggested_action\":\"fix_code\"}}"
+    },
+    {
+      "time": "2026-04-01T23:56:52.2349016Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:57:20.939495Z",
+      "kind": "worker_requested",
+      "message": "C:implement"
+    },
+    {
+      "time": "2026-04-02T00:04:35.5271799Z",
+      "kind": "worker_succeeded",
+      "message": "Validated the diff-tracking change already in progress: `internal/domain/types.go` now includes `Step.DiffSummary`, `internal/orchestrator/service.go` populates it only on successful sequential worker completion via `git -C \u003cworkspace\u003e diff --stat`, and missing git / non-repo / command failure cases return an empty string without failing the step. `docs/ARCHITECTURE.md` documents the new step metadata. Investigated the `internal/mcp` test failure and found an unrelated Windows persistence issue: repeated state writes could fail because `os.Rename` does not replace existing files on Windows. Fixed that in `internal/store/state_store.go`, added an overwrite regression test in `internal/store/state_store_test.go`, and kept the MCP async wait helpers in `internal/mcp/server_test.go` at 15s to reduce timing flake. Commands run: `git status --short`; file inspections with `Get-Content`/`rg`; `go test ./internal/mcp -count=1` (passed); `go test ./... -count=1` (initially failed in `internal/mcp`, later passed after fixes); `go test ./internal/store ./internal/mcp -count=10` (passed once during validation); `go test ./internal/mcp -count=10` (still intermittently flaky under stress); `gofmt -w internal/domain/types.go internal/orchestrator/service.go internal/store/state_store.go internal/store/state_store_test.go internal/mcp/server_test.go`; `go build ./...` (passed); final `go test ./... -count=1` (passed). Non-fatal shell warnings appeared on every command from the blocked PowerShell profile script."
+    },
+    {
+      "time": "2026-04-02T00:04:35.5281732Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-02T00:05:09.881066Z",
+      "kind": "evaluation_passed",
+      "message": "A succeeded implement step covers the job goal and reports the required build/test verification passing."
+    },
+    {
+      "time": "2026-04-02T00:05:09.8820591Z",
+      "kind": "job_completed",
+      "message": "Sprint contract satisfied. `Step.DiffSummary` was added in `internal/domain/types.go`, successful worker-step completion in `internal/orchestrator/service.go` now captures `git diff --stat` from the workspace with graceful empty-string fallback when git is unavailable or the workspace is not a repo, relevant docs were updated in `docs/ARCHITECTURE.md`, and required verification passed with `go build ./...` and `go test ./...`. Residual note: `internal/mcp` still shows intermittent timeout flake under repeated stress runs, but the required verification command completed successfully."
+    }
+  ],
+  "created_at": "2026-04-01T23:50:19.3375505Z",
+  "updated_at": "2026-04-02T00:05:09.8820591Z"
+}

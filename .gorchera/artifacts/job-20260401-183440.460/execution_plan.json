@@ -1,0 +1,56 @@
+{
+  "goal": "Add `Multiply(a, b int) int` to `main.go` and add a corresponding test in `main_test.go`.",
+  "tech_stack": "Go",
+  "workspace_dir": "D:\\News\\Business\\sandbox-test",
+  "summary": "Inspect the existing Go files to confirm current structure and test style, then implement a new `Multiply(a, b int) int` function in `main.go` that returns the product of its arguments. Add or update `main_test.go` with a focused unit test that verifies the expected multiplication result, and run the relevant Go test command to confirm the change passes without introducing regressions.",
+  "product_scope": [
+    "Update `main.go` to define `Multiply(a, b int) int`.",
+    "Update `main_test.go` to cover `Multiply` with at least one unit test.",
+    "Verify the change with Go tests in the workspace."
+  ],
+  "non_goals": [
+    "Refactoring unrelated application code.",
+    "Changing existing behavior outside the new `Multiply` function and its test.",
+    "Adding extra math helpers beyond `Multiply`.",
+    "Introducing new dependencies or build tooling changes."
+  ],
+  "proposed_steps": [
+    "Inspect `main.go` and `main_test.go` to understand the current package, functions, and test conventions.",
+    "Add `Multiply(a, b int) int` to `main.go` with logic that returns `a * b`.",
+    "Add a unit test in `main_test.go` that calls `Multiply` and asserts the expected product.",
+    "Run `go test` for the relevant package to verify the new test passes and no existing tests regress."
+  ],
+  "success_signals": [
+    "The repository contains the new `Multiply` function in `main.go`.",
+    "The repository contains a passing test for `Multiply` in `main_test.go`.",
+    "Running Go tests reports success without failures."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that the new `Multiply` function and its unit test are present and that Go tests pass.",
+    "scope": [
+      "`main.go` implementation",
+      "`main_test.go` test coverage",
+      "Go test execution for the affected package"
+    ],
+    "required_commands": [
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\sandbox-test\\main.go",
+      "D:\\News\\Business\\sandbox-test\\main_test.go"
+    ],
+    "required_checks": [
+      "Confirm `main.go` defines `func Multiply(a, b int) int`.",
+      "Confirm `main_test.go` includes a test that calls `Multiply`.",
+      "Confirm `go test ./...` exits successfully."
+    ],
+    "disallowed_actions": [
+      "Do not modify unrelated files or behavior.",
+      "Do not add unnecessary dependencies or tooling changes."
+    ],
+    "max_seconds": 120,
+    "notes": "Keep the change minimal and aligned with existing code style and test patterns.",
+    "owner_role": "executor"
+  }
+}

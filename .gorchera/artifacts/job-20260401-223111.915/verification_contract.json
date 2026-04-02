@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Add structured worker failure reasons so the supervisor receives machine-parseable error feedback for failed or blocked worker steps.",
+  "summary": "Verify Update the domain model to carry a structured failure reason on steps, implement error classification in the orchestrator for worker failure and blocked paths, emit the structured reason as JSON in the corresponding events, and verify the change with repository build and test runs while keeping behavior aligned with existing orchestration principles. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-223111.915\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-223111.915\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-223111.915\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-223111.915\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

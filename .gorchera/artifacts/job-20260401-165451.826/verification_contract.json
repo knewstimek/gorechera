@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "goal": "List the files in the current directory and summarize the project structure",
+  "summary": "Verify Gorechera is a Go-based stateful multi-agent orchestration engine. The project follows standard Go layout: cmd/ for CLI entry point, internal/ for core packages (api, domain, orchestrator, policy, provider, runtime, schema, store), docs/ for architecture and design documents, and examples/ for sample configs. The codebase contains ~30 Go source files across 8 internal packages, with a prebuilt gorechera.exe binary at root. This is a read-only reconnaissance task requiring directory listing and file enumeration only. with required steps: implement, review, test",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-165451.826\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-165451.826\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-165451.826\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-165451.826\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement",
+    "review",
+    "test"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

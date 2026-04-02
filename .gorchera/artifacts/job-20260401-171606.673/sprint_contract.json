@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "goal": "Add a single-line comment to the top of README.md that says: gorechera orchestrator",
+  "required_step_types": [
+    "implement",
+    "review",
+    "test"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 3,
+  "threshold_min_steps": 3,
+  "threshold_require_eval": true
+}

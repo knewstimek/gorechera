@@ -1,0 +1,29 @@
+{
+  "status": "blocked",
+  "passed": false,
+  "score": 90,
+  "reason": "All 6 required verification checks pass. All required artifacts exist. Build succeeds, all 15 unit tests pass, CLI produces correct output for both -c and -f flags, exits non-zero with error on no args, and conversion functions are exported. Table-driven tests with comprehensive coverage including edge cases and round-trip. Score docked 10 points because the 'review' step type listed in the sprint contract was not executed as a distinct step.",
+  "missing_step_types": [
+    "review",
+    "test",
+    "test step"
+  ],
+  "evidence": [
+    "SYS:command",
+    "B:implement",
+    "C:implement",
+    "SYS:build",
+    "SYS:build",
+    "go.mod line 1: 'module tempconv' - PASS",
+    "go test -v: 3 test functions (TestCToF, TestFToC, TestRoundTrip), 15 subtests, all PASS, 0 failures",
+    "tempconv.exe -c 100 output: '100.00C = 212.00F' contains 212 - PASS",
+    "tempconv.exe -f 32 output: '32.00F = 0.00C' contains 0 - PASS",
+    "tempconv.exe with no args: exit code 1, stderr 'Error: no flag provided' - PASS",
+    "CToF and FToC are exported functions in main.go, tested directly in main_test.go - PASS",
+    "No third-party imports: only flag, fmt, os, math, testing from stdlib - PASS",
+    "Table-driven tests cover freezing, boiling, -40, body temp, absolute zero, negatives, round-trip - PASS",
+    "go build -o tempconv.exe: exit code 0 - PASS",
+    "Sprint contract file not found on disk but job state shows required steps: implement, review, test. 'review' step was not executed."
+  ],
+  "contract_ref": ".gorechera\\artifacts\\job-20260401-181147.992\\verification_contract.json"
+}

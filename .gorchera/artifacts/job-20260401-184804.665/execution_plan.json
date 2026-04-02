@@ -1,0 +1,61 @@
+{
+  "goal": "Add a `Divide(a, b int) (int, error)` function to `main.go` and add tests for it in `main_test.go`.",
+  "tech_stack": "Go",
+  "workspace_dir": "D:\\News\\Business\\sandbox-test",
+  "summary": "Inspect the existing Go files to confirm current package structure and test style, then implement `Divide` in `main.go` so it returns integer division for valid inputs and a non-nil error when `b == 0`. Update `main_test.go` with focused tests that cover at least a successful division case and the divide-by-zero error path, then run the relevant Go tests to confirm the behavior and ensure no regressions in the touched files.",
+  "product_scope": [
+    "Modify `main.go` to add `Divide(a, b int) (int, error)`.",
+    "Modify `main_test.go` to add test coverage for normal division.",
+    "Modify `main_test.go` to add test coverage for divide-by-zero behavior.",
+    "Verify the updated Go tests pass in the workspace."
+  ],
+  "non_goals": [
+    "Refactoring unrelated code in the project.",
+    "Changing existing function signatures unrelated to `Divide`.",
+    "Adding features beyond integer division and zero-division error handling.",
+    "Introducing new dependencies or restructuring the package."
+  ],
+  "proposed_steps": [
+    "Read `main.go` and `main_test.go` to understand the current package, imports, and test conventions.",
+    "Implement `Divide(a, b int) (int, error)` in `main.go` with a zero-check that returns an error when `b` is zero.",
+    "Add or update tests in `main_test.go` to validate a successful division result.",
+    "Add or update tests in `main_test.go` to validate that dividing by zero returns a non-nil error.",
+    "Run `go test` for the workspace or relevant package and fix any small issues caused by the change."
+  ],
+  "success_signals": [
+    "The repository contains updated `main.go` and `main_test.go` files with the new function and tests.",
+    "Running `go test` reports success with no failing tests.",
+    "The divide-by-zero case is explicitly asserted in tests as an error condition."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that `Divide(a, b int) (int, error)` is implemented correctly and covered by passing tests.",
+    "scope": [
+      "`main.go` implementation",
+      "`main_test.go` test coverage",
+      "Go test execution for the package"
+    ],
+    "required_commands": [
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\sandbox-test\\main.go",
+      "D:\\News\\Business\\sandbox-test\\main_test.go"
+    ],
+    "required_checks": [
+      "Confirm `Divide(a, b int) (int, error)` exists in `main.go`.",
+      "Confirm `Divide` returns a non-nil error when called with `b == 0`.",
+      "Confirm tests cover at least one successful division case.",
+      "Confirm tests cover the zero-divisor error case.",
+      "Confirm `go test ./...` exits successfully."
+    ],
+    "disallowed_actions": [
+      "Do not modify unrelated files.",
+      "Do not add new third-party dependencies.",
+      "Do not change behavior outside the requested `Divide` feature and its tests."
+    ],
+    "max_seconds": 120,
+    "notes": "Keep the change minimal and aligned with existing project style.",
+    "owner_role": "executor"
+  }
+}

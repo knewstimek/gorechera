@@ -1,0 +1,17 @@
+{
+  "category": "command",
+  "command": "go",
+  "args": [
+    "mod",
+    "init",
+    "tempconv"
+  ],
+  "exit_code": 0,
+  "stderr": "go: creating new go.mod: module tempconv\n",
+  "started_at": "2026-04-01T18:12:33.3494414Z",
+  "finished_at": "2026-04-01T18:12:33.3865355Z",
+  "duration": 37094100,
+  "timed_out": false,
+  "truncated_stdout": false,
+  "truncated_stderr": false
+}

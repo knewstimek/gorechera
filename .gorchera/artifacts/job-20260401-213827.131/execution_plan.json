@@ -1,0 +1,66 @@
+{
+  "goal": "Extract the duplicated `firstNonEmpty(vals ...string) string` helper into `internal/orchestrator/util.go`, remove the duplicate definitions from `service.go` and `evaluator.go`, keep all existing call sites compiling, and verify with build and tests.",
+  "tech_stack": "Go",
+  "workspace_dir": "D:\\News\\Business\\gorechera-test",
+  "summary": "Inspect the two duplicated helper implementations in the orchestrator package, move the shared `firstNonEmpty` function into a new package-local utility file at `internal/orchestrator/util.go`, delete the redundant definitions from `internal/orchestrator/service.go` and `internal/orchestrator/evaluator.go`, then run `go build ./...` and `go test ./...` to confirm the package still compiles and behaves correctly. Update docs only if the refactor materially affects documented structure or conventions.",
+  "product_scope": [
+    "`internal/orchestrator/service.go` duplicate helper removal",
+    "`internal/orchestrator/evaluator.go` duplicate helper removal",
+    "new shared helper file `internal/orchestrator/util.go`",
+    "package-level compile integrity for orchestrator call sites",
+    "repository verification via `go build ./...` and `go test ./...`"
+  ],
+  "non_goals": [
+    "Changing the behavior or signature of `firstNonEmpty`",
+    "Refactoring unrelated orchestrator utilities or package structure",
+    "Modifying provider, CLI, or workflow semantics outside this helper extraction",
+    "Adding new features beyond the helper deduplication",
+    "Changing evaluator gate, harness, approval, or worker-spawn behavior"
+  ],
+  "proposed_steps": [
+    "Inspect `internal/orchestrator/service.go` and `internal/orchestrator/evaluator.go` to confirm the duplicated `firstNonEmpty` implementations are identical or compatible.",
+    "Create `internal/orchestrator/util.go` in package `orchestrator` and move a single shared `firstNonEmpty(vals ...string) string` implementation there.",
+    "Remove the duplicate `firstNonEmpty` definitions from `internal/orchestrator/service.go` and `internal/orchestrator/evaluator.go` without altering existing call sites.",
+    "Run formatting if needed so the new file and edited files match repository conventions.",
+    "Run `go build ./...` to confirm the refactor compiles across the repo.",
+    "Run `go test ./...` to verify no regressions.",
+    "Update documentation only if this shared utility extraction changes any documented file layout or conventions in a meaningful way."
+  ],
+  "success_signals": [
+    "Search results show exactly one `func firstNonEmpty` definition under `internal/orchestrator`.",
+    "The new shared helper is referenced implicitly by existing package-local call sites with no import churn.",
+    "Build succeeds with no duplicate symbol or undefined identifier errors.",
+    "Test suite passes after the refactor."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that `firstNonEmpty` was deduplicated into a shared orchestrator utility file and that the repository still builds and tests successfully.",
+    "scope": [
+      "Check helper definition locations within `internal/orchestrator`.",
+      "Confirm duplicate removals from `service.go` and `evaluator.go`.",
+      "Validate repository build and test execution."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\gorechera-test\\internal\\orchestrator\\util.go",
+      "D:\\News\\Business\\gorechera-test\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\gorechera-test\\internal\\orchestrator\\evaluator.go"
+    ],
+    "required_checks": [
+      "Exactly one `firstNonEmpty` function definition remains in package `orchestrator`.",
+      "`go build ./...` exits successfully.",
+      "`go test ./...` exits successfully."
+    ],
+    "disallowed_actions": [
+      "Do not change the behavior or signature of `firstNonEmpty`.",
+      "Do not introduce cross-package moves or public API changes.",
+      "Do not skip build or test verification."
+    ],
+    "max_seconds": 600,
+    "notes": "This is a small internal refactor. Docs should only be updated if the repository explicitly documents orchestrator utility file layout and the change makes those docs stale.",
+    "owner_role": "executor"
+  }
+}

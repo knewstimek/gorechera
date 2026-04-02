@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "passed": true,
+  "score": 96,
+  "reason": "The job state includes a succeeded implement step that directly covers the requested prompt-text updates in `internal/provider/protocol.go` and reports successful `go build ./...` and `go test ./...` verification.",
+  "evidence": [
+    "B:implement",
+    "`steps[0]` has `task_type=\"implement\"` and `status=\"succeeded\"`.",
+    "Step summary states `buildLeaderPrompt` now includes the explicit orchestrator supervisor / MCP monitoring / `[SUPERVISOR]` / non-implementation wording requested.",
+    "Step summary states `buildWorkerPrompt` now includes executor assignment and reporting expectations.",
+    "Step summary states `buildPlannerPrompt` and `buildEvaluatorPrompt` now include analogous hierarchy descriptions.",
+    "Step summary reports `go build ./...` succeeded and `go test ./...` succeeded with no errors affecting verification."
+  ],
+  "contract_ref": ".gorechera\\artifacts\\job-20260401-224719.058\\verification_contract.json"
+}

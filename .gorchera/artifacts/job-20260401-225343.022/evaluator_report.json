@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "passed": true,
+  "score": 96,
+  "reason": "The job state includes a succeeded implement step that matches the requested goal and reports the required code changes plus successful `go build ./...` and `go test ./...` verification.",
+  "evidence": [
+    "B:implement",
+    "Step 1 has `task_type\":\"implement\"` and `status\":\"succeeded\"`.",
+    "Step summary states `internal/orchestrator/service.go` was updated with `consecutiveSummarizes`, reset behavior on non-`summarize` actions, and forced complete behavior on a third consecutive summarize with event `leader_summarize_capped`.",
+    "Step summary states the capped summarize path still runs `evaluateCompletion()` semantics rather than bypassing the evaluator gate.",
+    "Step summary states `internal/provider/protocol.go` was updated with the exact new leader prompt rule forbidding summarize abuse.",
+    "Step summary reports `go build ./...` succeeded.",
+    "Step summary reports `go test ./...` succeeded."
+  ],
+  "contract_ref": ".gorechera\\artifacts\\job-20260401-225343.022\\verification_contract.json"
+}

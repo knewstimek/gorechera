@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Rename all in-file project references from gorechera/Gorechera to gorchera/Gorchera across the repository without renaming any filesystem paths, then verify the Go project still builds and tests.",
+  "summary": "Verify Apply a repo-wide content rename with controlled scope: update the Go module path in go.mod, replace Go import prefixes and string literals in .go/.md/.json files, update .gorechera state/artifact path references to .gorchera, refresh project/docs/config mentions including CLAUDE.md, AGENTS.md, docs, README.md, and .mcp.json, while intentionally leaving on-disk directory names unchanged such as cmd/gorechera and any real .gorechera directory. After edits, verify there are no remaining in-scope gorechera/Gorechera content references and confirm the repository passes go build ./... and go test ./.... with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260402-000741.967\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260402-000741.967\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260402-000741.967\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260402-000741.967\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

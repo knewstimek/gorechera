@@ -1,0 +1,47 @@
+{
+  "id": "job-20260401-164642.974",
+  "goal": "List the files in the current directory and summarize the project structure",
+  "tech_stack": "go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "role_profiles": {
+    "planner": {
+      "provider": "claude"
+    },
+    "leader": {
+      "provider": "claude"
+    },
+    "executor": {
+      "provider": "claude"
+    },
+    "reviewer": {
+      "provider": "claude"
+    },
+    "tester": {
+      "provider": "claude"
+    },
+    "evaluator": {
+      "provider": "claude"
+    }
+  },
+  "status": "failed",
+  "provider": "claude",
+  "max_steps": 8,
+  "current_step": 0,
+  "retry_count": 0,
+  "failure_reason": "planner execution failed: claude provider command_failed (claude): provider command failed",
+  "leader_context_summary": "Goal: List the files in the current directory and summarize the project structure",
+  "events": [
+    {
+      "time": "2026-04-01T16:46:42.9740649Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T16:46:44.0436938Z",
+      "kind": "job_failed",
+      "message": "planner execution failed: claude provider command_failed (claude): provider command failed"
+    }
+  ],
+  "created_at": "2026-04-01T16:46:42.9740649Z",
+  "updated_at": "2026-04-01T16:46:44.0436938Z"
+}

@@ -1,0 +1,94 @@
+{
+  "id": "job-20260401-165328.454",
+  "goal": "List the files in the current directory and summarize the project structure",
+  "tech_stack": "go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "role_profiles": {
+    "planner": {
+      "provider": "claude"
+    },
+    "leader": {
+      "provider": "claude"
+    },
+    "executor": {
+      "provider": "claude"
+    },
+    "reviewer": {
+      "provider": "claude"
+    },
+    "tester": {
+      "provider": "claude"
+    },
+    "evaluator": {
+      "provider": "claude"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify the project structure summary is accurate and complete",
+    "scope": [
+      "Accuracy of file listing against actual filesystem",
+      "Correctness of package descriptions against source code",
+      "No fabricated files or packages"
+    ],
+    "required_commands": [
+      "go build ./..."
+    ],
+    "required_artifacts": [
+      "step-NN-project_structure_summary.md",
+      ".gorechera\\artifacts\\job-20260401-165328.454\\verification_contract.json"
+    ],
+    "required_checks": [
+      "File tree matches output of recursive directory listing",
+      "Each listed Go package exists and description matches its actual code",
+      "Entry points (main.go, service.go, provider.go) are correctly identified"
+    ],
+    "disallowed_actions": [
+      "No file creation or modification outside artifacts",
+      "No code changes"
+    ],
+    "max_seconds": 60,
+    "notes": "Read-only task. Build command is a sanity check only -- no tests needed.",
+    "owner_role": "tester"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-165328.454\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-165328.454\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-165328.454\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-165328.454\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-165328.454\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-165328.454\\sprint_contract.json",
+  "status": "failed",
+  "provider": "claude",
+  "max_steps": 8,
+  "current_step": 0,
+  "retry_count": 0,
+  "failure_reason": "leader schema validation failed: run_workers requires valid worker targets",
+  "summary": "Read-only reconnaissance task: enumerate all files in D:\\News\\Business\\AIOrchestrator and produce a structured summary of the Gorechera project layout, package responsibilities, and key entry points. No code changes required.",
+  "leader_context_summary": "Read-only reconnaissance task: enumerate all files in D:\\News\\Business\\AIOrchestrator and produce a structured summary of the Gorechera project layout, package responsibilities, and key entry points. No code changes required.",
+  "events": [
+    {
+      "time": "2026-04-01T16:53:28.4541361Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T16:54:06.0740503Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T16:54:06.0750434Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T16:54:36.593685Z",
+      "kind": "job_failed",
+      "message": "leader schema validation failed: run_workers requires valid worker targets"
+    }
+  ],
+  "created_at": "2026-04-01T16:53:28.4541361Z",
+  "updated_at": "2026-04-01T16:54:36.593685Z"
+}

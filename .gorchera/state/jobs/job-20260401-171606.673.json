@@ -1,0 +1,122 @@
+{
+  "id": "job-20260401-171606.673",
+  "goal": "Add a single-line comment to the top of README.md that says: gorechera orchestrator",
+  "tech_stack": "go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "role_profiles": {
+    "planner": {
+      "provider": "claude"
+    },
+    "leader": {
+      "provider": "claude"
+    },
+    "executor": {
+      "provider": "claude"
+    },
+    "reviewer": {
+      "provider": "claude"
+    },
+    "tester": {
+      "provider": "claude"
+    },
+    "evaluator": {
+      "provider": "claude"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify README.md has the comment line prepended correctly",
+    "scope": [
+      "README.md"
+    ],
+    "required_commands": [
+      "head -1 README.md"
+    ],
+    "required_artifacts": [
+      "README.md",
+      ".gorechera\\artifacts\\job-20260401-171606.673\\verification_contract.json"
+    ],
+    "required_checks": [
+      "First line of README.md is exactly: \u003c!-- gorechera orchestrator --\u003e",
+      "Original content of README.md is fully preserved after the first line"
+    ],
+    "disallowed_actions": [
+      "Modifying any file other than README.md",
+      "Deleting or reordering existing README.md content"
+    ],
+    "max_seconds": 60,
+    "owner_role": "tester"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-171606.673\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-171606.673\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-171606.673\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-171606.673\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-171606.673\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-171606.673\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-171606.673\\evaluator_report.json",
+  "status": "blocked",
+  "provider": "claude",
+  "max_steps": 4,
+  "current_step": 1,
+  "retry_count": 0,
+  "blocked_reason": "README.md의 첫 줄이 정확히 '\u003c!-- gorechera orchestrator --\u003e'이고 원본 내용도 보존되어 implement 결과 자체는 올바르나, sprint contract가 요구하는 3개 step type(implement, review, test) 중 implement만 완료됨. review와 test step이 아직 실행되지 않아 threshold_min_steps=3, threshold_success_count=3 조건을 충족하지 못함.",
+  "summary": "Prepend a single line \"\u003c!-- gorechera orchestrator --\u003e\" (HTML comment, the standard comment syntax for Markdown) to the top of README.md in the workspace directory. This is a trivial file edit requiring one step.",
+  "leader_context_summary": "README.md의 첫 줄이 정확히 '\u003c!-- gorechera orchestrator --\u003e'이고 원본 내용도 보존되어 implement 결과 자체는 올바르나, sprint contract가 요구하는 3개 step type(implement, review, test) 중 implement만 완료됨. review와 test step이 아직 실행되지 않아 threshold_min_steps=3, threshold_success_count=3 조건을 충족하지 못함.",
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Prepend the line \"\u003c!-- gorechera orchestrator --\u003e\" to the top of README.md in the workspace directory D:\\News\\Business\\AIOrchestrator. Read the current content of README.md first, then write it back with the new comment line as the very first line, followed by the original content unchanged.",
+      "status": "succeeded",
+      "summary": "Prepended \"\u003c!-- gorechera orchestrator --\u003e\" as the first line of README.md. Original content is fully preserved starting from line 2. Verified with head -1.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-171606.673\\step-01-README.md",
+        ".gorechera\\artifacts\\job-20260401-171606.673\\step-01-verification_contract.json"
+      ],
+      "started_at": "2026-04-01T17:16:31.1580584Z",
+      "finished_at": "2026-04-01T17:17:15.8939371Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T17:16:06.6734524Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T17:16:22.3068049Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T17:16:22.3082949Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T17:16:31.1580584Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T17:17:15.8939371Z",
+      "kind": "worker_succeeded",
+      "message": "Prepended \"\u003c!-- gorechera orchestrator --\u003e\" as the first line of README.md. Original content is fully preserved starting from line 2. Verified with head -1."
+    },
+    {
+      "time": "2026-04-01T17:17:15.8954272Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T17:17:51.5071024Z",
+      "kind": "evaluation_blocked",
+      "message": "README.md의 첫 줄이 정확히 '\u003c!-- gorechera orchestrator --\u003e'이고 원본 내용도 보존되어 implement 결과 자체는 올바르나, sprint contract가 요구하는 3개 step type(implement, review, test) 중 implement만 완료됨. review와 test step이 아직 실행되지 않아 threshold_min_steps=3, threshold_success_count=3 조건을 충족하지 못함."
+    }
+  ],
+  "created_at": "2026-04-01T17:16:06.6734524Z",
+  "updated_at": "2026-04-01T17:17:51.5071024Z"
+}

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Add a Multiply(a, b int) int function to main.go and add a corresponding test in main_test.go.",
+  "summary": "Verify Inspect the existing Go files to align with current package and test structure, add a new Multiply(a, b int) int function in main.go that returns the product of its inputs, then add or extend a unit test in main_test.go to verify correct multiplication behavior. Finish by running the Go test suite to confirm the new function compiles and the test passes without introducing unrelated changes. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-183826.664\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-183826.664\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-183826.664\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-183826.664\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

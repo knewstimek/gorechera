@@ -1,0 +1,16 @@
+{
+  "category": "build",
+  "command": "go",
+  "args": [
+    "test",
+    "-v"
+  ],
+  "exit_code": 0,
+  "stdout": "=== RUN   TestCToF\n=== RUN   TestCToF/freezing\n=== RUN   TestCToF/boiling\n=== RUN   TestCToF/negative_forty\n=== RUN   TestCToF/body_temp\n=== RUN   TestCToF/absolute_zero\n=== RUN   TestCToF/negative\n=== RUN   TestCToF/below_freezing\n--- PASS: TestCToF (0.00s)\n    --- PASS: TestCToF/freezing (0.00s)\n    --- PASS: TestCToF/boiling (0.00s)\n    --- PASS: TestCToF/negative_forty (0.00s)\n    --- PASS: TestCToF/body_temp (0.00s)\n    --- PASS: TestCToF/absolute_zero (0.00s)\n    --- PASS: TestCToF/negative (0.00s)\n    --- PASS: TestCToF/below_freezing (0.00s)\n=== RUN   TestFToC\n=== RUN   TestFToC/freezing\n=== RUN   TestFToC/boiling\n=== RUN   TestFToC/negative_forty\n=== RUN   TestFToC/body_temp\n=== RUN   TestFToC/absolute_zero\n=== RUN   TestFToC/negative\n=== RUN   TestFToC/below_freezing\n--- PASS: TestFToC (0.00s)\n    --- PASS: TestFToC/freezing (0.00s)\n    --- PASS: TestFToC/boiling (0.00s)\n    --- PASS: TestFToC/negative_forty (0.00s)\n    --- PASS: TestFToC/body_temp (0.00s)\n    --- PASS: TestFToC/absolute_zero (0.00s)\n    --- PASS: TestFToC/negative (0.00s)\n    --- PASS: TestFToC/below_freezing (0.00s)\n=== RUN   TestRoundTrip\n--- PASS: TestRoundTrip (0.00s)\nPASS\nok  \ttempconv\t0.781s\n",
+  "started_at": "2026-04-01T18:13:40.9873902Z",
+  "finished_at": "2026-04-01T18:13:42.2662398Z",
+  "duration": 1278849600,
+  "timed_out": false,
+  "truncated_stdout": false,
+  "truncated_stderr": false
+}

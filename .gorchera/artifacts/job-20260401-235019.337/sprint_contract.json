@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Add artifact diff tracking to the orchestrator. After each worker step completes successfully, compute a simple diff of what changed in the workspace. In internal/orchestrator/service.go, after a worker step succeeds, run git diff --stat in the workspace directory (if it is a git repo) and store the result in a new field Step.DiffSummary string (add to internal/domain/types.go). If the workspace is not a git repo or git is not available, leave DiffSummary empty. This gives the supervisor visibility into what each worker actually changed. Run go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

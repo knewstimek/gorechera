@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Add workspace directory validation before job execution in orchestrator Start/StartAsync and MCP start-job handling, then verify with build and tests.",
+  "summary": "Verify Implement a small preflight validation path for job creation so invalid workspace directories are rejected before persistence or background execution. Update internal/orchestrator/service.go so Start and StartAsync validate the resolved job.WorkspaceDir immediately after job construction and return a clear error when the path is invalid. Mirror that validation in internal/mcp/server.go toolStartJob so MCP callers get a friendly failure before StartAsync is invoked. Add regression coverage for service and MCP behavior, update the relevant docs to reflect the new validation, and finish by running go build ./... and go test ./... with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-223740.262\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-223740.262\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-223740.262\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-223740.262\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

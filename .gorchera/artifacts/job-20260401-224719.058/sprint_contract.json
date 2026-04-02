@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Improve leader prompt role hierarchy clarity. In internal/provider/protocol.go buildLeaderPrompt, update the opening instruction text to explicitly state: \"You are a leader component operating under an orchestrator supervisor. The supervisor agent monitors your decisions via MCP tools and may inject [SUPERVISOR] directives into the leader context. You coordinate workers (executor, reviewer, tester) but do not perform implementation yourself.\" Also in buildWorkerPrompt, add: \"You are an executor worker assigned by the leader. You perform the implementation task described below. Report results accurately including files changed, commands run, and any errors encountered.\" Also in buildPlannerPrompt and buildEvaluatorPrompt, add similar role-hierarchy descriptions. Run go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Fix the leader summarize loop anti-pattern. Two changes needed:\n\n1. In internal/orchestrator/service.go runLoop, track consecutive summarize actions. If the leader calls summarize 2 times in a row without any worker/system action in between, do NOT allow a 3rd summarize. Instead, treat it as if the leader chose \"complete\" and run evaluateCompletion. Add a counter variable consecutiveSummarizes that resets to 0 when any non-summarize action happens. When consecutiveSummarizes \u003e= 2 and leader picks summarize again, log an event \"leader_summarize_capped\" and force complete.\n\n2. In internal/provider/protocol.go buildLeaderPrompt, add this rule to the prompt text: \"Do NOT use summarize as a substitute for complete. Summarize is only for recording intermediate progress between worker dispatches. If all required work is done and verified, choose complete immediately. Do not summarize more than once consecutively.\"\n\nRun go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

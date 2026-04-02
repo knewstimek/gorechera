@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Rename the project from gorechera to gorchera. This is a find-and-replace across the entire codebase:\n\n1. In go.mod, change module name from \"gorechera\" to \"gorchera\"\n2. In ALL .go files, replace import path \"gorechera/\" with \"gorchera/\" \n3. In ALL .go files, .md files, .json files, replace the string \"gorechera\" with \"gorchera\" and \"Gorechera\" with \"Gorchera\" (case-sensitive replacements)\n4. Rename the .gorechera directory references in code to .gorchera (the state_store.go, artifact_store.go paths)\n5. In CLAUDE.md, AGENTS.md, docs/*.md, README.md - replace all gorechera/Gorechera with gorchera/Gorchera\n6. In .mcp.json, replace gorechera with gorchera\n7. In cmd/gorechera/main.go path - note this is the filesystem path, just update string references inside the file\n\nDo NOT rename actual directories on disk (like .gorechera/ or cmd/gorechera/) - only change the content of files.\n\nRun go build ./... and go test ./... to verify after all replacements.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

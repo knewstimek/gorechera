@@ -1,0 +1,71 @@
+{
+  "goal": "Clarify prompt role hierarchy text in `internal/provider/protocol.go` for leader, worker, planner, and evaluator prompts, then verify with Go build and tests.",
+  "tech_stack": "Go, prompt construction in provider protocol layer, Go toolchain (`go build`, `go test`)",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Update the role-introduction text in `internal/provider/protocol.go` so each orchestration role has explicit hierarchy and responsibility boundaries: leader operates under an orchestrator supervisor and coordinates workers without implementing, worker executes implementation tasks and reports files/commands/errors, and planner/evaluator receive parallel hierarchy-oriented descriptions consistent with the system design. After editing, review any related documentation references that should stay aligned with prompt semantics, then run `go build ./...` and `go test ./...` to confirm the prompt text change does not break compilation or existing behavior.",
+  "product_scope": [
+    "Modify `buildLeaderPrompt` opening instruction text in `internal/provider/protocol.go`.",
+    "Modify `buildWorkerPrompt` opening instruction text in `internal/provider/protocol.go`.",
+    "Modify `buildPlannerPrompt` opening instruction text in `internal/provider/protocol.go`.",
+    "Modify `buildEvaluatorPrompt` opening instruction text in `internal/provider/protocol.go`.",
+    "Keep prompt wording aligned with existing orchestrator role boundaries and principles.",
+    "Run repository verification with `go build ./...` and `go test ./...`.",
+    "Update relevant `docs/` content only if current documentation explicitly describes these prompt role semantics and would otherwise become inconsistent."
+  ],
+  "non_goals": [
+    "No changes to orchestration state machine behavior or task routing.",
+    "No changes to provider interfaces, schemas, or adapter transport logic beyond prompt text.",
+    "No implementation of Claude adapter work or other roadmap items.",
+    "No bypass of evaluator gate, approval flow, or harness semantics.",
+    "No broad prompt rewrites outside the targeted role-hierarchy introductions."
+  ],
+  "proposed_steps": [
+    "Inspect `internal/provider/protocol.go` to locate `buildLeaderPrompt`, `buildWorkerPrompt`, `buildPlannerPrompt`, and `buildEvaluatorPrompt` and confirm current opening text patterns.",
+    "Revise `buildLeaderPrompt` to use the explicit supervisor/leader/worker hierarchy statement provided in the job goal, preserving surrounding prompt structure.",
+    "Revise `buildWorkerPrompt` to state executor-worker responsibility clearly, including accurate reporting of files changed, commands run, and errors encountered.",
+    "Add parallel hierarchy-aware opening instructions to `buildPlannerPrompt` and `buildEvaluatorPrompt` that match their existing responsibilities and the orchestrator-supervisor model.",
+    "Review nearby prompt-building code for wording consistency and ensure no conflicting legacy text remains.",
+    "Check whether any documentation in `docs/` explicitly describes these role prompts; update only the directly affected references if needed to keep docs aligned with the code change.",
+    "Run `go build ./...` from the workspace root and resolve any compile issues.",
+    "Run `go test ./...` from the workspace root and confirm all tests pass."
+  ],
+  "success_signals": [
+    "Diff is limited primarily to `internal/provider/protocol.go` and any narrowly relevant documentation files.",
+    "Prompt text reads unambiguously and reinforces supervisor \u003e leader \u003e worker role separation.",
+    "`go build ./...` exits successfully with no compilation errors.",
+    "`go test ./...` exits successfully with all tests passing.",
+    "No unrelated orchestration logic or provider behavior changes are introduced."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that role-hierarchy prompt text was updated correctly in `internal/provider/protocol.go` and that the repository still builds and tests cleanly.",
+    "scope": [
+      "Prompt text changes for leader, worker, planner, and evaluator roles.",
+      "Build and test verification from the workspace root.",
+      "Documentation consistency only where directly impacted by the prompt text change."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go"
+    ],
+    "required_checks": [
+      "Confirm `buildLeaderPrompt` contains the explicit supervisor-monitoring and non-implementation wording.",
+      "Confirm `buildWorkerPrompt` contains executor assignment and reporting expectations.",
+      "Confirm `buildPlannerPrompt` and `buildEvaluatorPrompt` include analogous hierarchy descriptions.",
+      "Confirm build command succeeds without errors.",
+      "Confirm test command succeeds without failures."
+    ],
+    "disallowed_actions": [
+      "Do not change orchestration logic beyond prompt text and directly related wording cleanup.",
+      "Do not bypass evaluator-gate, approval, or harness principles.",
+      "Do not introduce Windows-specific behavior into core logic.",
+      "Do not modify unrelated adapters, state-machine behavior, or roadmap features."
+    ],
+    "max_seconds": 1200,
+    "notes": "Keep edits minimal and localized. If documentation does not explicitly cover these prompt introductions, no doc change is required beyond preserving consistency with repository standards.",
+    "owner_role": "planner"
+  }
+}

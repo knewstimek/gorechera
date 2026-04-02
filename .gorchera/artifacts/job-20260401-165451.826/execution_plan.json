@@ -1,0 +1,62 @@
+{
+  "goal": "List the files in the current directory and summarize the project structure",
+  "tech_stack": "go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Gorechera is a Go-based stateful multi-agent orchestration engine. The project follows standard Go layout: cmd/ for CLI entry point, internal/ for core packages (api, domain, orchestrator, policy, provider, runtime, schema, store), docs/ for architecture and design documents, and examples/ for sample configs. The codebase contains ~30 Go source files across 8 internal packages, with a prebuilt gorechera.exe binary at root. This is a read-only reconnaissance task requiring directory listing and file enumeration only.",
+  "product_scope": [
+    "Enumerate all files and directories in the workspace root",
+    "Recursively list the project tree structure",
+    "Summarize the purpose of each top-level directory and key files",
+    "Identify the package layout and architectural organization"
+  ],
+  "non_goals": [
+    "Do not modify any files",
+    "Do not build or test the project",
+    "Do not analyze code logic or find bugs"
+  ],
+  "proposed_steps": [
+    "Step 1: List root directory contents (AGENTS.md, CLAUDE.md, README.md, Old/, cmd/, docs/, examples/, go.mod, gorechera.exe, internal/)",
+    "Step 2: Recursively list all files under cmd/, internal/, docs/, examples/ to build a complete file tree",
+    "Step 3: Read key files (go.mod, README.md, docs/ARCHITECTURE.md) to understand module name, dependencies, and architectural overview",
+    "Step 4: Produce a structured summary: root files, cmd/gorechera/main.go (CLI entry), internal/ packages (api, domain, orchestrator, policy, provider, runtime, schema, store), docs/ (6 markdown files), examples/ (sample config)"
+  ],
+  "success_signals": [
+    "Complete file tree listing produced",
+    "Each top-level directory purpose identified",
+    "Package structure and entry points documented",
+    "Summary matches actual on-disk state"
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that the file listing is complete and the project summary is accurate",
+    "scope": [
+      "Root directory listing completeness",
+      "Recursive file tree accuracy",
+      "Summary correctness against actual structure"
+    ],
+    "required_commands": [
+      "ls D:/News/Business/AIOrchestrator",
+      "find D:/News/Business/AIOrchestrator -type f | wc -l"
+    ],
+    "required_artifacts": [
+      "file_tree_listing",
+      "project_structure_summary"
+    ],
+    "required_checks": [
+      "All top-level entries present: AGENTS.md, CLAUDE.md, README.md, Old/, cmd/, docs/, examples/, go.mod, gorechera.exe, internal/",
+      "Go source count matches (~30 files)",
+      "Summary mentions all 8 internal packages: api, domain, orchestrator, policy, provider, runtime, schema, store",
+      "No files were modified (git status clean or no changes)"
+    ],
+    "disallowed_actions": [
+      "File creation",
+      "File modification",
+      "File deletion",
+      "go build",
+      "go test"
+    ],
+    "max_seconds": 60,
+    "notes": "Pure read-only task. Verification should confirm listing completeness by cross-checking with independent directory enumeration.",
+    "owner_role": "tester"
+  }
+}

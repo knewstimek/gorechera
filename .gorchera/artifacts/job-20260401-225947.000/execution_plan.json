@@ -1,0 +1,63 @@
+{
+  "goal": "Add a loop-based `Power(base, exp int) int` function in `main.go` and tests in `main_test.go` for the specified cases.",
+  "tech_stack": "Go",
+  "workspace_dir": "D:\\News\\Business\\sandbox-test",
+  "summary": "Update the Go codebase by adding a `Power` helper in `main.go` that computes integer exponentiation with a simple loop and no `math.Pow` usage, then add table-style or direct unit tests in `main_test.go` covering the required inputs and outputs. Finish by running the relevant Go test command to confirm the new function compiles and the added cases pass.",
+  "product_scope": [
+    "Add `Power(base, exp int) int` to `main.go`.",
+    "Implement exponentiation using iterative multiplication in a loop.",
+    "Return `1` when `exp` is `0`.",
+    "Add unit tests in `main_test.go` for `Power(2,3)==8`, `Power(5,0)==1`, and `Power(3,1)==3`.",
+    "Verify the implementation with Go tests."
+  ],
+  "non_goals": [
+    "Using `math.Pow` or floating-point arithmetic.",
+    "Changing unrelated application behavior or refactoring unrelated code.",
+    "Adding support for negative exponents unless already required by existing code.",
+    "Introducing new files beyond the necessary updates to `main.go` and `main_test.go`."
+  ],
+  "proposed_steps": [
+    "Inspect `main.go` and `main_test.go` to confirm current package structure and existing test style.",
+    "Add `Power(base, exp int) int` to `main.go` using a loop that multiplies an accumulator initialized to `1`, repeating `exp` times.",
+    "Ensure the zero-exponent case naturally returns `1` via the accumulator logic.",
+    "Add unit tests in `main_test.go` covering the three required cases.",
+    "Run `go test` for the package and fix any compile or test issues if they arise."
+  ],
+  "success_signals": [
+    "A diff shows `Power` added to `main.go` and tests added to `main_test.go`.",
+    "No `math.Pow` import or call appears in the implementation.",
+    "The Go test command exits successfully.",
+    "The specified test cases pass without modifying unrelated files."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that a loop-based integer `Power` function was added correctly and is covered by passing unit tests for the required cases.",
+    "scope": [
+      "`main.go` implementation of `Power(base, exp int) int`.",
+      "`main_test.go` coverage for the three specified inputs."
+    ],
+    "required_commands": [
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\sandbox-test\\main.go",
+      "D:\\News\\Business\\sandbox-test\\main_test.go"
+    ],
+    "required_checks": [
+      "Confirm `Power(base, exp int) int` exists in `main.go`.",
+      "Confirm the implementation uses iterative multiplication and does not use `math.Pow`.",
+      "Confirm tests in `main_test.go` assert `Power(2,3)==8`.",
+      "Confirm tests in `main_test.go` assert `Power(5,0)==1`.",
+      "Confirm tests in `main_test.go` assert `Power(3,1)==3`.",
+      "Confirm `go test ./...` succeeds."
+    ],
+    "disallowed_actions": [
+      "Do not use `math.Pow`.",
+      "Do not introduce floating-point conversions for exponentiation.",
+      "Do not modify unrelated files or behaviors."
+    ],
+    "max_seconds": 120,
+    "notes": "Keep the change minimal and aligned with existing package and test conventions.",
+    "owner_role": "tester"
+  }
+}

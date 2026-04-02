@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Add sequential job-chain orchestration so a supervisor can submit multiple goals and have each next job start automatically after the previous job finishes successfully.",
+  "summary": "Verify Introduce persisted chain state in the domain and state store, add orchestrator service APIs to create/load/list/advance chains, and wire chain progression into terminal job handling so chained jobs start one-by-one. Expose the feature through MCP tools for chain creation and status lookup, add focused tests for persistence, service advancement, and MCP behavior, and update architecture/status docs to reflect the new sequential workflow surface. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-232810.198\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-232810.198\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-232810.198\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-232810.198\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

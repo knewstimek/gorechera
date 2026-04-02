@@ -1,0 +1,17 @@
+{
+  "category": "command",
+  "command": "go",
+  "args": [
+    "mod",
+    "init",
+    "tempconv"
+  ],
+  "exit_code": 1,
+  "stderr": "go: D:\\News\\Business\\sandbox-test\\go.mod already exists\n",
+  "started_at": "2026-04-01T17:53:22.8209382Z",
+  "finished_at": "2026-04-01T17:53:22.8616642Z",
+  "duration": 40726000,
+  "timed_out": false,
+  "truncated_stdout": false,
+  "truncated_stderr": false
+}

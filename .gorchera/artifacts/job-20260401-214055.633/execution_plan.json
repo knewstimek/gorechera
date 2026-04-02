@@ -1,0 +1,70 @@
+{
+  "goal": "Add rough token and cost tracking to orchestrator job and step state, with accumulation after each provider call and build/test verification.",
+  "tech_stack": "Go, internal domain models, orchestrator service loop, Go toolchain",
+  "workspace_dir": "D:\\News\\Business\\gorechera-test",
+  "summary": "Update the domain model to introduce a shared TokenUsage structure and embed it on both Job and Step, then extend the orchestrator service to estimate prompt/response token usage after each provider interaction (leader, worker, planner, evaluator), accumulate those estimates onto the current step and overall job, and keep the implementation localized with a helper function for consistent estimation. After code changes, update the relevant documentation to reflect the new tracking behavior and verify the repo still builds and tests cleanly with the standard Go commands.",
+  "product_scope": [
+    "Add TokenUsage struct to internal/domain/types.go with InputTokens, OutputTokens, TotalTokens, and EstimatedCostUSD.",
+    "Add TokenUsage fields to Job and Step so usage is stored in orchestrator state.",
+    "Implement estimateTokens(input, output string) TokenUsage in internal/orchestrator/service.go.",
+    "Invoke token estimation after RunLeader, RunWorker, RunPlanner, and RunEvaluator responses and accumulate usage on both job and current step.",
+    "Update relevant docs to mention token/cost tracking behavior.",
+    "Run repository verification with go build ./... and go test ./..."
+  ],
+  "non_goals": [
+    "Integrating provider-native token accounting or real billing APIs.",
+    "Changing provider interfaces to return exact usage metadata.",
+    "Adding new CLI/reporting surfaces for token usage unless already required by existing state serialization.",
+    "Reworking orchestrator flow beyond the minimal changes needed for accounting.",
+    "Addressing unrelated bugs or refactors outside the touched token-tracking path."
+  ],
+  "proposed_steps": [
+    "Inspect internal/domain/types.go and internal/orchestrator/service.go to confirm current Job, Step, and provider-call flow.",
+    "Add TokenUsage to the domain types and embed it into Job and Step with names consistent with existing serialization/state patterns.",
+    "Implement a small estimation helper in the orchestrator service that converts input/output character lengths into rough token counts and derives total tokens and estimated USD cost.",
+    "Wire the helper into each provider call site (RunLeader, RunWorker, RunPlanner, RunEvaluator), capturing the prompt/input text and returned output text, then accumulate the result onto the current step and overall job.",
+    "Update the most relevant docs under docs/ to describe the new token/cost tracking behavior and estimation caveat.",
+    "Run go build ./... and go test ./... and fix any compile or test regressions caused by the new fields or accounting logic."
+  ],
+  "success_signals": [
+    "Job state can now hold cumulative token/cost information.",
+    "Each step records its own estimated token/cost usage after provider execution.",
+    "Provider-call sites show consistent accounting through a shared helper rather than duplicated ad hoc math.",
+    "Repository builds and test suite passes without regressions after the change.",
+    "Docs and code remain aligned on the rough-estimate behavior."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that rough token/cost tracking is added to orchestrator state, applied after each provider call, documented, and validated by build/test execution.",
+    "scope": [
+      "Domain model changes in internal/domain/types.go.",
+      "Provider-call accounting changes in internal/orchestrator/service.go.",
+      "Relevant documentation updates under docs/.",
+      "Repository verification via standard Go build and test commands."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\gorechera-test\\internal\\domain\\types.go",
+      "D:\\News\\Business\\gorechera-test\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\gorechera-test\\docs"
+    ],
+    "required_checks": [
+      "Confirm TokenUsage exists with the required fields and is attached to Job and Step.",
+      "Confirm estimateTokens(input, output string) TokenUsage exists and is used after RunLeader, RunWorker, RunPlanner, and RunEvaluator.",
+      "Confirm usage is accumulated onto both the job and the current step.",
+      "Confirm documentation reflects the new token/cost tracking behavior.",
+      "Confirm go build ./... and go test ./... both succeed."
+    ],
+    "disallowed_actions": [
+      "Do not bypass existing orchestration/evaluation flow semantics.",
+      "Do not introduce provider-specific exact billing logic or external pricing dependencies.",
+      "Do not make unrelated refactors or behavior changes outside token tracking and required doc updates."
+    ],
+    "max_seconds": 1200,
+    "notes": "Use rough estimation only, based on 1 token per 4 characters for input and output text, and keep the implementation localized and additive.",
+    "owner_role": "planner"
+  }
+}

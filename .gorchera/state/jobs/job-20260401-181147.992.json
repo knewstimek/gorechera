@@ -1,0 +1,233 @@
+{
+  "id": "job-20260401-181147.992",
+  "goal": "Create a Go CLI tool that converts temperature between Celsius and Fahrenheit. Accept a number and a flag (-c or -f). Print the converted value. Include unit tests in main_test.go. Initialize with go mod init tempconv.",
+  "workspace_dir": "D:/News/Business/sandbox-test2",
+  "role_profiles": {
+    "planner": {
+      "provider": "claude",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "claude",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "claude",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "claude",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "claude",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "claude",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify tempconv CLI tool builds, runs correctly, and passes all unit tests",
+    "scope": [
+      "main.go",
+      "main_test.go",
+      "go.mod"
+    ],
+    "required_commands": [
+      "cd D:/News/Business/sandbox-test2 \u0026\u0026 go build -o tempconv.exe",
+      "cd D:/News/Business/sandbox-test2 \u0026\u0026 go test -v"
+    ],
+    "required_artifacts": [
+      "D:/News/Business/sandbox-test2/go.mod",
+      "D:/News/Business/sandbox-test2/main.go",
+      "D:/News/Business/sandbox-test2/main_test.go",
+      ".gorechera\\artifacts\\job-20260401-181147.992\\verification_contract.json"
+    ],
+    "required_checks": [
+      "go.mod contains 'module tempconv'",
+      "go test -v output shows all PASS, zero failures",
+      "tempconv.exe -c 100 outputs value containing 212",
+      "tempconv.exe -f 32 outputs value containing 0",
+      "tempconv.exe with no args or invalid input exits non-zero with error message",
+      "Conversion functions are exported or testable from main_test.go"
+    ],
+    "disallowed_actions": [
+      "Do not use third-party dependencies",
+      "Do not modify files outside workspace_dir"
+    ],
+    "max_seconds": 120,
+    "notes": "Conversion precision should be at least 2 decimal places. Use table-driven tests for comprehensive coverage.",
+    "owner_role": "tester"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-181147.992\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-181147.992\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-181147.992\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-181147.992\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-181147.992\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-181147.992\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-181147.992\\evaluator_report.json",
+  "status": "blocked",
+  "provider": "claude",
+  "max_steps": 8,
+  "current_step": 5,
+  "retry_count": 0,
+  "blocked_reason": "All 6 required verification checks pass. All required artifacts exist. Build succeeds, all 15 unit tests pass, CLI produces correct output for both -c and -f flags, exits non-zero with error on no args, and conversion functions are exported. Table-driven tests with comprehensive coverage including edge cases and round-trip. Score docked 10 points because the 'review' step type listed in the sprint contract was not executed as a distinct step.",
+  "summary": "Build a single-file Go CLI tool in D:/News/Business/sandbox-test2. Initialize the module with `go mod init tempconv`, implement main.go with flag parsing (-c for Celsius input, -f for Fahrenheit input) and conversion logic, then write comprehensive unit tests in main_test.go covering normal cases, edge cases (0, negative, absolute zero), and error handling. The tool reads a numeric value and a flag, prints the converted temperature with the target unit label.",
+  "leader_context_summary": "All 6 required verification checks pass. All required artifacts exist. Build succeeds, all 15 unit tests pass, CLI produces correct output for both -c and -f flags, exits non-zero with error on no args, and conversion functions are exported. Table-driven tests with comprehensive coverage including edge cases and round-trip. Score docked 10 points because the 'review' step type listed in the sprint contract was not executed as a distinct step.",
+  "steps": [
+    {
+      "index": 1,
+      "target": "SYS",
+      "task_type": "command",
+      "task_text": "Initialize Go module with 'go mod init tempconv' in the workspace directory",
+      "status": "succeeded",
+      "summary": "command go exited with code 0",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-181147.992\\step-01-runtime_result.json"
+      ],
+      "started_at": "2026-04-01T18:12:33.3476342Z",
+      "finished_at": "2026-04-01T18:12:33.3871881Z"
+    },
+    {
+      "index": 2,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Create main.go in D:/News/Business/sandbox-test2 for a Go CLI temperature converter. Requirements: 1) Use flag package with -c flag (float64, converts Celsius input to Fahrenheit) and -f flag (float64, converts Fahrenheit input to Celsius). 2) Export conversion functions CToF(c float64) float64 and FToC(f float64) float64 so they are testable from main_test.go. 3) Formulas: F = C*9/5+32, C = (F-32)*5/9. 4) Print result with 2 decimal places and unit label (e.g. '100.00C = 212.00F'). 5) If no flags or invalid input, print usage to stderr and os.Exit(1). 6) If both -c and -f provided, print error and exit 1. 7) Package is main. 8) No third-party dependencies. Use mcp__agent-tool__write to create the file. Use tabs for indentation.",
+      "status": "succeeded",
+      "summary": "Created main.go with exported CToF/FToC functions, flag-based CLI (-c/-f), 2-decimal output, mutual exclusion check, and non-zero exit on missing/invalid input.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-181147.992\\step-02-main.go"
+      ],
+      "started_at": "2026-04-01T18:12:49.8928107Z",
+      "finished_at": "2026-04-01T18:13:18.7084233Z"
+    },
+    {
+      "index": 3,
+      "target": "C",
+      "task_type": "implement",
+      "task_text": "Create main_test.go in D:/News/Business/sandbox-test2 with comprehensive unit tests for the tempconv CLI. Requirements: 1) Package is main. 2) Test the exported functions CToF and FToC (CToF(c float64) float64 converts Celsius to Fahrenheit: F=C*9/5+32, FToC(f float64) float64 converts Fahrenheit to Celsius: C=(F-32)*5/9). 3) Use table-driven tests with these cases: 0C=32F, 100C=212F, -40C=-40F, 37C=98.6F, boiling/freezing, negative values, absolute zero (-273.15C=-459.67F). 4) Test both directions (CToF and FToC). 5) Use math.Abs for float comparison with epsilon 0.01. 6) No third-party dependencies. Use mcp__agent-tool__write to create the file. Use tabs for indentation.",
+      "status": "succeeded",
+      "summary": "Created main_test.go in D:/News/Business/sandbox-test2 with table-driven tests for CToF and FToC covering: freezing (0C=32F), boiling (100C=212F), negative forty (-40C=-40F), body temp (37C=98.6F), absolute zero (-273.15C=-459.67F), negative values, and a round-trip test. Uses math.Abs with epsilon 0.01 for float comparison. No third-party dependencies. Package main.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-181147.992\\step-03-main_test.go"
+      ],
+      "started_at": "2026-04-01T18:12:49.8928107Z",
+      "finished_at": "2026-04-01T18:13:18.7084233Z"
+    },
+    {
+      "index": 4,
+      "target": "SYS",
+      "task_type": "build",
+      "task_text": "Build the tempconv CLI tool to verify compilation succeeds before running tests",
+      "status": "succeeded",
+      "summary": "build go exited with code 0",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-181147.992\\step-04-runtime_result.json"
+      ],
+      "started_at": "2026-04-01T18:13:29.8458347Z",
+      "finished_at": "2026-04-01T18:13:30.2401399Z"
+    },
+    {
+      "index": 5,
+      "target": "SYS",
+      "task_type": "build",
+      "task_text": "Run go test -v to execute all unit tests and verify they pass",
+      "status": "succeeded",
+      "summary": "build go exited with code 0",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-181147.992\\step-05-runtime_result.json"
+      ],
+      "started_at": "2026-04-01T18:13:40.9856332Z",
+      "finished_at": "2026-04-01T18:13:42.2670849Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T18:11:47.9926602Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T18:12:18.848975Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T18:12:18.8499683Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T18:12:33.3476342Z",
+      "kind": "system_requested",
+      "message": "SYS:command"
+    },
+    {
+      "time": "2026-04-01T18:12:33.3871881Z",
+      "kind": "system_succeeded",
+      "message": "command go exited with code 0"
+    },
+    {
+      "time": "2026-04-01T18:12:33.3882196Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T18:12:49.8928107Z",
+      "kind": "parallel_workers_requested",
+      "message": "parallel fan-out with 2 workers"
+    },
+    {
+      "time": "2026-04-01T18:13:18.70892Z",
+      "kind": "parallel_workers_succeeded",
+      "message": "parallel fan-out with 2 workers completed"
+    },
+    {
+      "time": "2026-04-01T18:13:18.7094164Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T18:13:29.8458347Z",
+      "kind": "system_requested",
+      "message": "SYS:build"
+    },
+    {
+      "time": "2026-04-01T18:13:30.2401399Z",
+      "kind": "system_succeeded",
+      "message": "build go exited with code 0"
+    },
+    {
+      "time": "2026-04-01T18:13:30.2411331Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T18:13:40.9856332Z",
+      "kind": "system_requested",
+      "message": "SYS:build"
+    },
+    {
+      "time": "2026-04-01T18:13:42.2670849Z",
+      "kind": "system_succeeded",
+      "message": "build go exited with code 0"
+    },
+    {
+      "time": "2026-04-01T18:13:42.2680782Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T18:15:26.2052818Z",
+      "kind": "evaluation_blocked",
+      "message": "All 6 required verification checks pass. All required artifacts exist. Build succeeds, all 15 unit tests pass, CLI produces correct output for both -c and -f flags, exits non-zero with error on no args, and conversion functions are exported. Table-driven tests with comprehensive coverage including edge cases and round-trip. Score docked 10 points because the 'review' step type listed in the sprint contract was not executed as a distinct step."
+    }
+  ],
+  "created_at": "2026-04-01T18:11:47.9926602Z",
+  "updated_at": "2026-04-01T18:15:26.2052818Z"
+}

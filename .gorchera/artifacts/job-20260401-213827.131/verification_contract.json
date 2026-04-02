@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Extract the duplicated `firstNonEmpty(vals ...string) string` helper into `internal/orchestrator/util.go`, remove the duplicate definitions from `service.go` and `evaluator.go`, keep all existing call sites compiling, and verify with build and tests.",
+  "summary": "Verify Inspect the two duplicated helper implementations in the orchestrator package, move the shared `firstNonEmpty` function into a new package-local utility file at `internal/orchestrator/util.go`, delete the redundant definitions from `internal/orchestrator/service.go` and `internal/orchestrator/evaluator.go`, then run `go build ./...` and `go test ./...` to confirm the package still compiles and behaves correctly. Update docs only if the refactor materially affects documented structure or conventions. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-213827.131\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-213827.131\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-213827.131\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-213827.131\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

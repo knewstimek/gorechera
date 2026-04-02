@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "passed": true,
+  "score": 96,
+  "reason": "A succeeded implement step covers the job goal and reports the required build/test verification passing.",
+  "evidence": [
+    "C:implement",
+    "Step 2 has task_type=\"implement\" and status=\"succeeded\".",
+    "Step 2 summary states `internal/domain/types.go` includes `Step.DiffSummary`.",
+    "Step 2 summary states `internal/orchestrator/service.go` populates the diff summary only after successful worker completion via `git -C \u003cworkspace\u003e diff --stat`.",
+    "Step 2 summary states missing git, non-repo, or command failure cases leave `DiffSummary` empty without failing the step.",
+    "Step 2 summary states `docs/ARCHITECTURE.md` was updated to document the feature.",
+    "Step 2 summary reports `go build ./...` passed and final `go test ./... -count=1` passed."
+  ],
+  "contract_ref": ".gorechera\\artifacts\\job-20260401-235019.337\\verification_contract.json"
+}

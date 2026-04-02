@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Fix 4 high-severity audit findings. DO NOT add new features, only fix the issues described:\n\n1. SUPERVISOR prompt injection: In internal/orchestrator/service.go, wherever worker/system summaries or block reasons are written to job.LeaderContextSummary, strip any text that starts with \"[SUPERVISOR]\" from the untrusted input. Add a helper sanitizeLeaderContext(text string) string that removes lines starting with \"[SUPERVISOR]\". Apply it in runWorkerStep and runSystemStep when setting LeaderContextSummary.\n\n2. Workspace validation strengthening: In both internal/orchestrator/service.go validateWorkspaceDir and internal/mcp/server.go validateWorkspaceDir, add: (a) require absolute path using filepath.IsAbs, (b) resolve symlinks with filepath.EvalSymlinks before stat check. Unify the two copies into one shared function if possible (put in a new file internal/orchestrator/workspace.go and import from mcp).\n\n3. Steer authorization: In internal/orchestrator/service.go Steer method, check that job.Status is \"running\" or \"waiting_leader\" or \"waiting_worker\" before accepting the directive. Return error for done/failed/cancelled jobs.\n\n4. Steer directive preservation: In internal/orchestrator/service.go, instead of writing to LeaderContextSummary directly, add a new field SupervisorDirective string to domain.Job (in internal/domain/types.go). Steer writes to this field. In internal/provider/protocol.go buildLeaderPrompt, if job.SupervisorDirective is non-empty, include it as a separate section BEFORE the job state. After the leader processes it (when runLoop gets the next leader response), clear the field.\n\nRun go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

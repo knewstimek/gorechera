@@ -1,0 +1,89 @@
+{
+  "goal": "Rename all in-file project references from gorechera/Gorechera to gorchera/Gorchera across the repository without renaming any filesystem paths, then verify the Go project still builds and tests.",
+  "tech_stack": "Go, Markdown, JSON",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Apply a repo-wide content rename with controlled scope: update the Go module path in go.mod, replace Go import prefixes and string literals in .go/.md/.json files, update .gorechera state/artifact path references to .gorchera, refresh project/docs/config mentions including CLAUDE.md, AGENTS.md, docs, README.md, and .mcp.json, while intentionally leaving on-disk directory names unchanged such as cmd/gorechera and any real .gorechera directory. After edits, verify there are no remaining in-scope gorechera/Gorechera content references and confirm the repository passes go build ./... and go test ./....",
+  "product_scope": [
+    "Update module name in go.mod from gorechera to gorchera.",
+    "Replace import path prefix gorechera/ with gorchera/ in all .go files.",
+    "Replace case-sensitive string occurrences gorechera-\u003egorchera and Gorechera-\u003eGorchera in all .go, .md, and .json files.",
+    "Update .gorechera content references to .gorchera in code, including state/artifact store paths.",
+    "Update project documentation and repo metadata files including CLAUDE.md, AGENTS.md, README.md, docs/*.md, and .mcp.json.",
+    "Keep existing filesystem paths such as cmd/gorechera/main.go in place while updating only file contents.",
+    "Build and test validation with go build ./... and go test ./... ."
+  ],
+  "non_goals": [
+    "Do not rename directories or files on disk, including cmd/gorechera or any real .gorechera directory.",
+    "Do not change package structure, runtime behavior, APIs, or orchestrator semantics beyond the textual rename.",
+    "Do not introduce unrelated refactors, formatting-only churn, or dependency changes.",
+    "Do not modify binary/generated artifacts unless they are tracked text files within the stated extensions and scope.",
+    "Do not skip documentation/config updates that are explicitly listed in scope."
+  ],
+  "proposed_steps": [
+    "Scan the repository for in-scope occurrences of gorechera/Gorechera in go.mod, .go, .md, .json, docs, CLAUDE.md, AGENTS.md, README.md, .mcp.json, and targeted .gorechera path references.",
+    "Update go.mod module declaration from gorechera to gorchera.",
+    "Apply content-only replacements across all .go files: change import prefix gorechera/ to gorchera/ and replace remaining gorechera/Gorechera string literals where applicable.",
+    "Apply content-only replacements across all .md and .json files, including CLAUDE.md, AGENTS.md, README.md, docs/*.md, and .mcp.json.",
+    "Specifically verify code references to .gorechera state/artifact storage paths are changed to .gorchera without renaming any actual directories.",
+    "Run a residual search to confirm no in-scope gorechera/Gorechera content remains, excluding intentional filesystem path names that are not to be renamed.",
+    "Run go build ./... and go test ./... and resolve any rename-induced breakage until both pass.",
+    "Summarize changed areas and verification evidence for reviewer/tester handoff."
+  ],
+  "success_signals": [
+    "Repository text searches show only gorchera/Gorchera in the targeted content scope.",
+    "Imports resolve under the new module path without compilation errors.",
+    "State/artifact store path constants reference .gorchera in code.",
+    "Documentation and config files consistently use the new project name.",
+    "Both build and test commands pass from the workspace root."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that the repository was renamed in-file from gorechera to gorchera across the defined text scope, without filesystem renames, and that the Go project still builds and tests successfully.",
+    "scope": [
+      "go.mod",
+      "all .go files",
+      "all .md files",
+      "all .json files",
+      "CLAUDE.md",
+      "AGENTS.md",
+      "README.md",
+      "docs/*.md",
+      ".mcp.json",
+      "code references to .gorechera paths",
+      "content inside cmd/gorechera/main.go only"
+    ],
+    "required_commands": [
+      "rg -n \"gorechera|Gorechera|gorechera/|\\.gorechera\" -g \"*.go\" -g \"*.md\" -g \"*.json\" go.mod README.md CLAUDE.md AGENTS.md docs .mcp.json cmd",
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\go.mod",
+      "D:\\News\\Business\\AIOrchestrator\\README.md",
+      "D:\\News\\Business\\AIOrchestrator\\AGENTS.md",
+      "D:\\News\\Business\\AIOrchestrator\\CLAUDE.md",
+      "D:\\News\\Business\\AIOrchestrator\\.mcp.json",
+      "D:\\News\\Business\\AIOrchestrator\\cmd\\gorechera\\main.go",
+      "D:\\News\\Business\\AIOrchestrator\\docs"
+    ],
+    "required_checks": [
+      "Confirm go.mod module line uses gorchera.",
+      "Confirm no .go file contains import path prefix gorechera/.",
+      "Confirm no in-scope .go/.md/.json content contains gorechera or Gorechera.",
+      "Confirm state/artifact store code now references .gorchera, not .gorechera.",
+      "Confirm cmd/gorechera/main.go still exists at the same filesystem path.",
+      "Confirm no directories or files were renamed on disk as part of the change.",
+      "Confirm go build ./... exits successfully.",
+      "Confirm go test ./... exits successfully."
+    ],
+    "disallowed_actions": [
+      "Do not rename cmd/gorechera or any .gorechera directory on disk.",
+      "Do not change behavior beyond the textual project rename.",
+      "Do not bypass build/test verification.",
+      "Do not ignore residual in-scope gorechera/Gorechera matches without documenting a justified exception."
+    ],
+    "max_seconds": 900,
+    "notes": "Verification should treat filesystem path names as intentionally unchanged; only file contents are in scope for renaming. Residual search results must be reviewed to distinguish content from unchanged path names shown by tooling.",
+    "owner_role": "tester"
+  }
+}

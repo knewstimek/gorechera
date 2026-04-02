@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Improve error feedback for the supervisor agent. Currently when a worker fails or gets blocked, the event message is a free-form string that's hard to act on. Changes needed:\n\n1. In internal/domain/types.go, add a StructuredReason struct with fields: Category string (e.g. \"build_failure\", \"test_failure\", \"file_access\", \"timeout\", \"schema_violation\"), Detail string (what specifically failed), SuggestedAction string (e.g. \"retry\", \"fix_code\", \"check_permissions\", \"increase_timeout\"). Add a StructuredReason field to Step (optional, json omitempty).\n\n2. In internal/orchestrator/service.go, when a worker returns an error or blocked status, populate the StructuredReason by classifying the error. Add a helper function classifyWorkerFailure(err error, workerOutput string) *StructuredReason that checks for common patterns: \"build\" or \"compile\" errors -\u003e build_failure, \"test\" failures -\u003e test_failure, \"permission\" or \"access\" -\u003e file_access, context deadline -\u003e timeout, json unmarshal errors -\u003e schema_violation.\n\n3. In internal/orchestrator/service.go addEvent calls for worker_failed and worker_blocked, include the structured reason in the event message as JSON so the supervisor can parse it.\n\nRun go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

@@ -1,0 +1,149 @@
+{
+  "id": "job-20260401-214055.633",
+  "goal": "Add token/cost tracking to the orchestrator. In internal/domain/types.go, add a TokenUsage struct (InputTokens, OutputTokens, TotalTokens int, EstimatedCostUSD float64) and add a TokenUsage field to Job and to each Step. In internal/orchestrator/service.go, after each provider call (RunLeader, RunWorker, RunPlanner, RunEvaluator), estimate token usage from the response length (rough estimate: 1 token per 4 chars for input prompt, 1 token per 4 chars for output) and accumulate it on the job and current step. Add a helper function estimateTokens(input, output string) TokenUsage. Run go build ./... and go test ./... to verify.",
+  "workspace_dir": "D:\\News\\Business\\gorechera-test",
+  "strictness_level": "normal",
+  "role_profiles": {
+    "planner": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "codex",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that rough token/cost tracking is added to orchestrator state, applied after each provider call, documented, and validated by build/test execution.",
+    "scope": [
+      "Domain model changes in internal/domain/types.go.",
+      "Provider-call accounting changes in internal/orchestrator/service.go.",
+      "Relevant documentation updates under docs/.",
+      "Repository verification via standard Go build and test commands."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\gorechera-test\\internal\\domain\\types.go",
+      "D:\\News\\Business\\gorechera-test\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\gorechera-test\\docs",
+      ".gorechera\\artifacts\\job-20260401-214055.633\\verification_contract.json"
+    ],
+    "required_checks": [
+      "Confirm TokenUsage exists with the required fields and is attached to Job and Step.",
+      "Confirm estimateTokens(input, output string) TokenUsage exists and is used after RunLeader, RunWorker, RunPlanner, and RunEvaluator.",
+      "Confirm usage is accumulated onto both the job and the current step.",
+      "Confirm documentation reflects the new token/cost tracking behavior.",
+      "Confirm go build ./... and go test ./... both succeed."
+    ],
+    "disallowed_actions": [
+      "Do not bypass existing orchestration/evaluation flow semantics.",
+      "Do not introduce provider-specific exact billing logic or external pricing dependencies.",
+      "Do not make unrelated refactors or behavior changes outside token tracking and required doc updates."
+    ],
+    "max_seconds": 1200,
+    "notes": "Use rough estimation only, based on 1 token per 4 characters for input and output text, and keep the implementation localized and additive.",
+    "owner_role": "planner"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-214055.633\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-214055.633\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-214055.633\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-214055.633\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-214055.633\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-214055.633\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-214055.633\\evaluator_report.json",
+  "status": "done",
+  "provider": "codex",
+  "max_steps": 8,
+  "current_step": 1,
+  "retry_count": 0,
+  "summary": "Implemented the required TokenUsage model changes, added estimateTokens(input, output string) and accumulation after RunLeader, RunWorker, RunPlanner, and RunEvaluator, updated docs, and verification passed with go build ./... and go test ./....",
+  "leader_context_summary": "The job state includes a succeeded implement step that directly covers the requested token/cost tracking changes, documentation updates, and build/test verification.",
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Implement rough token/cost tracking for the orchestrator in D:\\News\\Business\\gorechera-test. Update internal/domain/types.go to add TokenUsage with fields InputTokens, OutputTokens, TotalTokens int and EstimatedCostUSD float64, and add a TokenUsage field to both Job and Step. Update internal/orchestrator/service.go to add helper estimateTokens(input, output string) TokenUsage using rough estimation of 1 token per 4 chars for input and output, then after each provider call (RunLeader, RunWorker, RunPlanner, RunEvaluator) compute usage from the prompt/input text and provider output text and accumulate it onto both the overall job and the current step. Keep changes localized and additive; do not alter evaluator gate or orchestration semantics and do not add exact billing logic or external pricing deps. Update relevant docs under docs/ to mention the new rough token/cost tracking behavior. Then run go build ./... and go test ./... and report results plus changed file paths.",
+      "status": "succeeded",
+      "summary": "Added rough token/cost tracking to orchestrator state. Introduced TokenUsage on Job and Step, added estimateTokens(input, output string) plus shared accumulation helpers, and applied tracking after RunLeader, RunWorker, RunPlanner, and RunEvaluator, including parallel worker execution. Updated docs to describe the heuristic tracking behavior. Verification passed: `go build ./...` succeeded and `go test ./...` succeeded.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-214055.633\\step-01-types.go",
+        ".gorechera\\artifacts\\job-20260401-214055.633\\step-01-service.go",
+        ".gorechera\\artifacts\\job-20260401-214055.633\\step-01-planning.go",
+        ".gorechera\\artifacts\\job-20260401-214055.633\\step-01-evaluator.go",
+        ".gorechera\\artifacts\\job-20260401-214055.633\\step-01-parallel.go",
+        ".gorechera\\artifacts\\job-20260401-214055.633\\step-01-ARCHITECTURE.md",
+        ".gorechera\\artifacts\\job-20260401-214055.633\\step-01-CODING_CONVENTIONS.md",
+        ".gorechera\\artifacts\\job-20260401-214055.633\\step-01-IMPLEMENTATION_STATUS.md"
+      ],
+      "started_at": "2026-04-01T21:41:40.709009Z",
+      "finished_at": "2026-04-01T21:46:03.9402767Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T21:40:55.6340953Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T21:41:28.1328563Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T21:41:28.1338497Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T21:41:40.709009Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T21:46:03.9402767Z",
+      "kind": "worker_succeeded",
+      "message": "Added rough token/cost tracking to orchestrator state. Introduced TokenUsage on Job and Step, added estimateTokens(input, output string) plus shared accumulation helpers, and applied tracking after RunLeader, RunWorker, RunPlanner, and RunEvaluator, including parallel worker execution. Updated docs to describe the heuristic tracking behavior. Verification passed: `go build ./...` succeeded and `go test ./...` succeeded."
+    },
+    {
+      "time": "2026-04-01T21:46:03.9412703Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T21:46:27.3178809Z",
+      "kind": "evaluation_passed",
+      "message": "The job state includes a succeeded implement step that directly covers the requested token/cost tracking changes, documentation updates, and build/test verification."
+    },
+    {
+      "time": "2026-04-01T21:46:27.3188741Z",
+      "kind": "job_completed",
+      "message": "Implemented the required TokenUsage model changes, added estimateTokens(input, output string) and accumulation after RunLeader, RunWorker, RunPlanner, and RunEvaluator, updated docs, and verification passed with go build ./... and go test ./...."
+    }
+  ],
+  "created_at": "2026-04-01T21:40:55.633906Z",
+  "updated_at": "2026-04-01T21:46:27.3188741Z"
+}

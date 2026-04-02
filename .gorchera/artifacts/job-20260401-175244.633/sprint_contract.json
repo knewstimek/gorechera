@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "goal": "Create a Go CLI tool that converts temperature between Celsius and Fahrenheit. The program should accept a number and a unit flag (-c for Celsius, -f for Fahrenheit) and print the converted value. Include unit tests in main_test.go. Initialize with go mod init tempconv.",
+  "required_step_types": [
+    "implement",
+    "review",
+    "test"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 3,
+  "threshold_min_steps": 3,
+  "threshold_require_eval": true
+}

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Add per-role model selection support to the Codex adapter and verify it with build/test.",
+  "summary": "Verify Update the Codex provider path so it mirrors the Claude adapter’s role-profile handling: resolve the execution profile for leader/planner/evaluator/worker in the Codex adapter entrypoints, pass that profile or its model into `runStructured`, and append `--model` to `codex exec` only when the resolved model is a Codex/GPT model and not a Claude shorthand such as `opus`, `sonnet`, or `haiku`. Add focused unit coverage for model flag injection and suppression cases, update the relevant status/architecture docs to reflect Codex per-role model selection, and finish with `go build ./...` plus `go test ./...`. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-234447.423\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-234447.423\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-234447.423\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-234447.423\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Implement job chaining for the orchestrator. This allows a supervisor to submit multiple goals that execute sequentially - when job N completes successfully, job N+1 starts automatically.\n\nChanges needed:\n\n1. In internal/domain/types.go, add a JobChain struct with fields: ID string, Goals []ChainGoal, CurrentIndex int, Status string (running/done/failed), CreatedAt/UpdatedAt time.Time. ChainGoal has: Goal string, Provider ProviderName, StrictnessLevel string, ContextMode string, MaxSteps int, JobID string (filled when started), Status string (pending/running/done/failed).\n\n2. In internal/orchestrator/service.go, add methods:\n- StartChain(ctx, goals []ChainGoal, workspaceDir string) (*JobChain, error) -- creates chain, starts first job\n- advanceChain(ctx, chain *JobChain) -- called when a job completes, starts next goal or marks chain done\n- GetChain(ctx, chainID string) (*JobChain, error)\n- ListChains(ctx) ([]*JobChain, error)\nWire advanceChain into the job completion path (after job reaches \"done\" status, check if it belongs to a chain and advance).\n\n3. In internal/mcp/server.go, add MCP tools:\n- gorechera_start_chain: params goals (array of objects with goal, provider, strictness_level, context_mode, max_steps), workspace_dir. Returns chain ID.\n- gorechera_chain_status: params chain_id. Returns chain state with all goals and their job IDs/statuses.\n\n4. In internal/store/state_store.go, add SaveChain/LoadChain/ListChains for file-based persistence (same pattern as jobs).\n\nRun go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

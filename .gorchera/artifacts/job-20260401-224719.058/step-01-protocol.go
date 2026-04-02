@@ -1,0 +1,5 @@
+{
+  "next_recommended_action": "No further action required.",
+  "status": "success",
+  "summary": "Updated role-hierarchy prompt text in D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go with minimal localized string edits only. buildLeaderPrompt now includes the explicit orchestrator supervisor / MCP monitoring / [SUPERVISOR] / non-implementation wording requested. buildWorkerPrompt now states the executor assignment and reporting expectations. buildPlannerPrompt and buildEvaluatorPrompt now include analogous hierarchy descriptions consistent with existing role boundaries. Docs were reviewed for direct consistency impact and left unchanged. Commands run: `go build ./...` succeeded, then `go test ./...` succeeded. Errors encountered: none after rerunning `go build ./...` with login shell disabled to avoid a PowerShell profile warning unrelated to the build result."
+}

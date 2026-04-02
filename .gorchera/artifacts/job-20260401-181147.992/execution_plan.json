@@ -1,0 +1,66 @@
+{
+  "goal": "Create a Go CLI tool (tempconv) that converts temperatures between Celsius and Fahrenheit using -c/-f flags, with unit tests.",
+  "tech_stack": "Go",
+  "workspace_dir": "D:/News/Business/sandbox-test2",
+  "summary": "Build a single-file Go CLI tool in D:/News/Business/sandbox-test2. Initialize the module with `go mod init tempconv`, implement main.go with flag parsing (-c for Celsius input, -f for Fahrenheit input) and conversion logic, then write comprehensive unit tests in main_test.go covering normal cases, edge cases (0, negative, absolute zero), and error handling. The tool reads a numeric value and a flag, prints the converted temperature with the target unit label.",
+  "product_scope": [
+    "CLI flag parsing: -c (input is Celsius, convert to Fahrenheit) and -f (input is Fahrenheit, convert to Celsius)",
+    "Temperature conversion: C-\u003eF = C*9/5+32, F-\u003eC = (F-32)*5/9",
+    "Formatted output with unit label (e.g. '100.00 F' or '37.78 C')",
+    "Error handling for missing/invalid arguments",
+    "Unit tests in main_test.go"
+  ],
+  "non_goals": [
+    "GUI or web interface",
+    "Supporting Kelvin or other temperature scales",
+    "Configuration files or persistent state",
+    "Third-party dependencies beyond Go stdlib"
+  ],
+  "proposed_steps": [
+    "Step 1: Run `go mod init tempconv` in workspace directory to initialize Go module",
+    "Step 2: Create main.go with conversion functions (CtoF, FtoC), flag parsing using os.Args or flag package, and formatted output",
+    "Step 3: Create main_test.go with table-driven tests covering: normal conversions, zero values, negative temperatures, boiling/freezing points, and invalid input handling",
+    "Step 4: Run `go build` to verify compilation",
+    "Step 5: Run `go test -v` to verify all tests pass",
+    "Step 6: Manual smoke test: run the binary with sample inputs (e.g. `tempconv -c 100`, `tempconv -f 32`)"
+  ],
+  "success_signals": [
+    "go build produces tempconv.exe without errors",
+    "go test -v shows PASS for all test cases",
+    "Running the binary with -c and -f flags produces correct converted values",
+    "Running with invalid input shows helpful error message"
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify tempconv CLI tool builds, runs correctly, and passes all unit tests",
+    "scope": [
+      "main.go",
+      "main_test.go",
+      "go.mod"
+    ],
+    "required_commands": [
+      "cd D:/News/Business/sandbox-test2 \u0026\u0026 go build -o tempconv.exe",
+      "cd D:/News/Business/sandbox-test2 \u0026\u0026 go test -v"
+    ],
+    "required_artifacts": [
+      "D:/News/Business/sandbox-test2/go.mod",
+      "D:/News/Business/sandbox-test2/main.go",
+      "D:/News/Business/sandbox-test2/main_test.go"
+    ],
+    "required_checks": [
+      "go.mod contains 'module tempconv'",
+      "go test -v output shows all PASS, zero failures",
+      "tempconv.exe -c 100 outputs value containing 212",
+      "tempconv.exe -f 32 outputs value containing 0",
+      "tempconv.exe with no args or invalid input exits non-zero with error message",
+      "Conversion functions are exported or testable from main_test.go"
+    ],
+    "disallowed_actions": [
+      "Do not use third-party dependencies",
+      "Do not modify files outside workspace_dir"
+    ],
+    "max_seconds": 120,
+    "notes": "Conversion precision should be at least 2 decimal places. Use table-driven tests for comprehensive coverage.",
+    "owner_role": "tester"
+  }
+}

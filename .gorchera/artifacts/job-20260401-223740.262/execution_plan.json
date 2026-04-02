@@ -1,0 +1,77 @@
+{
+  "goal": "Add workspace directory validation before job execution in orchestrator Start/StartAsync and MCP start-job handling, then verify with build and tests.",
+  "tech_stack": "Go 1.26, standard library, MCP JSON-RPC server",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Implement a small preflight validation path for job creation so invalid workspace directories are rejected before persistence or background execution. Update internal/orchestrator/service.go so Start and StartAsync validate the resolved job.WorkspaceDir immediately after job construction and return a clear error when the path is invalid. Mirror that validation in internal/mcp/server.go toolStartJob so MCP callers get a friendly failure before StartAsync is invoked. Add regression coverage for service and MCP behavior, update the relevant docs to reflect the new validation, and finish by running go build ./... and go test ./...",
+  "product_scope": [
+    "Pre-run workspace directory validation in internal/orchestrator/service.go Start",
+    "Pre-run workspace directory validation in internal/orchestrator/service.go StartAsync",
+    "MCP gorechera_start_job validation in internal/mcp/server.go before StartAsync",
+    "Regression tests for invalid workspace_dir handling",
+    "Relevant docs update for the new validation behavior",
+    "Repository verification with go build ./... and go test ./..."
+  ],
+  "non_goals": [
+    "Changing workspace fallback semantics based on workspaceRoot",
+    "Changing evaluator, approval, or runLoop behavior beyond early validation",
+    "Adding broader filesystem validation beyond this workspace_dir existence check",
+    "Changing unrelated MCP tools or job lifecycle APIs",
+    "Skipping required build and test verification"
+  ],
+  "proposed_steps": [
+    "Inspect the existing Start, StartAsync, and toolStartJob flows to identify the exact post-job-construction validation point and current MCP error surfacing behavior.",
+    "Add a small shared validation helper in internal/orchestrator/service.go or equivalent local logic that checks the resolved job.WorkspaceDir when non-empty with os.Stat and returns a clear error such as \"workspace directory does not exist: {path}\" before SaveJob or runLoop.",
+    "Apply that validation in both Start and StartAsync after the job struct is created and before any persistence or goroutine launch occurs.",
+    "Update internal/mcp/server.go toolStartJob to validate workspace_dir before calling StartAsync and return a user-friendly MCP-facing error for invalid input.",
+    "Add or extend tests in internal/orchestrator/service_test.go to cover Start and StartAsync rejecting a nonexistent workspace directory and preserving normal behavior for valid paths.",
+    "Add MCP regression coverage, likely via a new internal/mcp/server_test.go, to verify gorechera_start_job rejects an invalid workspace_dir with a friendly error message.",
+    "Update docs under docs/ to note that job creation now fails fast when workspace_dir is invalid.",
+    "Run go build ./... and go test ./... and use the results as the final verification gate."
+  ],
+  "success_signals": [
+    "Starting a job with a missing workspace path fails immediately with a clear path-specific error.",
+    "No background goroutine or persisted job is created for an invalid workspace_dir.",
+    "MCP callers see a readable validation failure for invalid workspace_dir instead of a generic downstream failure.",
+    "Existing valid job creation flows continue to work unchanged.",
+    "Repository-wide build and test commands pass after the change."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that invalid workspace directories are rejected at job creation time in orchestrator and MCP paths, with passing build and test suites.",
+    "scope": [
+      "internal/orchestrator/service.go validation changes",
+      "internal/mcp/server.go start-job validation changes",
+      "Regression tests for service and MCP behavior",
+      "Relevant docs update"
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\mcp\\server.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service_test.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\mcp\\server_test.go",
+      "D:\\News\\Business\\AIOrchestrator\\docs\\IMPLEMENTATION_STATUS.md"
+    ],
+    "required_checks": [
+      "Confirm Start rejects nonexistent workspace_dir before SaveJob/runLoop.",
+      "Confirm StartAsync rejects nonexistent workspace_dir before SaveJob/goroutine launch.",
+      "Confirm error text includes the invalid path.",
+      "Confirm toolStartJob rejects invalid workspace_dir before StartAsync and returns a friendly MCP-visible error.",
+      "Confirm valid workspace paths still allow normal job creation.",
+      "Confirm go build ./... passes.",
+      "Confirm go test ./... passes."
+    ],
+    "disallowed_actions": [
+      "Do not bypass existing job lifecycle semantics beyond early validation.",
+      "Do not change workspace fallback behavior unless required by the validation implementation.",
+      "Do not skip documentation updates.",
+      "Do not skip repository-wide build and test verification."
+    ],
+    "max_seconds": 900,
+    "notes": "Keep the change narrowly scoped to fail-fast workspace validation and matching regression coverage.",
+    "owner_role": "executor"
+  }
+}

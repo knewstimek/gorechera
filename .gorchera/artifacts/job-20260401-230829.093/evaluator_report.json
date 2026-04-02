@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "passed": true,
+  "score": 96,
+  "reason": "The job state includes a succeeded implement step that directly covers all four audit fixes and reports successful repository-wide verification with `go build ./...` and `go test ./...`.",
+  "evidence": [
+    "B:implement",
+    "Step 1 has `task_type: implement` and `status: succeeded`, matching the job goal.",
+    "Step summary reports `sanitizeLeaderContext` was added and applied to worker/system leader-context writes plus blocked-reason persistence.",
+    "Step summary reports shared workspace validation was centralized with absolute-path enforcement and `EvalSymlinks` before stat checks, and MCP now uses the shared validator.",
+    "Step summary reports `Steer` was restricted to `running`/`waiting_leader`/`waiting_worker` and now uses `Job.SupervisorDirective` instead of `LeaderContextSummary`.",
+    "Step summary reports leader prompt renders a separate supervisor directive section before job state and clears `SupervisorDirective` after the next successful leader turn.",
+    "Step summary reports focused tests were added/updated for the changed behaviors.",
+    "Step summary reports final verification passed: `go build ./...` and `go test ./...`.",
+    "Changed files listed in the succeeded step align with required artifacts: `internal/orchestrator/service.go`, `internal/orchestrator/workspace.go`, `internal/mcp/server.go`, `internal/domain/types.go`, and `internal/provider/protocol.go`."
+  ],
+  "contract_ref": ".gorechera\\artifacts\\job-20260401-230829.093\\verification_contract.json"
+}

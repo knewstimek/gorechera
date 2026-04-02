@@ -1,0 +1,20 @@
+{
+  "status": "blocked",
+  "passed": false,
+  "score": 40,
+  "reason": "README.md의 첫 줄이 정확히 '\u003c!-- gorechera orchestrator --\u003e'이고 원본 내용도 보존되어 implement 결과 자체는 올바르나, sprint contract가 요구하는 3개 step type(implement, review, test) 중 implement만 완료됨. review와 test step이 아직 실행되지 않아 threshold_min_steps=3, threshold_success_count=3 조건을 충족하지 못함.",
+  "missing_step_types": [
+    "review",
+    "test",
+    "test step"
+  ],
+  "evidence": [
+    "B:implement",
+    "README.md line 1: '\u003c!-- gorechera orchestrator --\u003e' -- 정확히 일치",
+    "README.md line 2+: 원본 내용 '# Gorechera' 등 보존 확인",
+    "sprint_contract.json required_step_types: [implement, review, test]",
+    "현재 steps 배열에 implement(index=1, succeeded)만 존재",
+    "threshold_min_steps=3이나 완료된 step은 1개"
+  ],
+  "contract_ref": ".gorechera\\artifacts\\job-20260401-171606.673\\sprint_contract.json"
+}

@@ -1,0 +1,5 @@
+{
+  "next_recommended_action": "Investigate the existing `internal/mcp` async status timeouts, then rerun `go test ./...`. If the intent is to cover parallel worker success paths too, extend the same `DiffSummary` helper into the parallel worker completion path in `internal/orchestrator/parallel.go` in a follow-up change.",
+  "status": "failed",
+  "summary": "Implemented diff tracking in `internal/domain/types.go` and `internal/orchestrator/service.go`: added `Step.DiffSummary` and populated it on successful single-worker steps via a small `git diff --stat` helper that returns an empty string when git is unavailable, the workspace is not a repo, or the command fails. Updated `docs/ARCHITECTURE.md` to document the new step metadata. Commands run: `gofmt -w internal/domain/types.go internal/orchestrator/service.go`, `go build ./...` (passed), `go test ./...` (failed)."
+}

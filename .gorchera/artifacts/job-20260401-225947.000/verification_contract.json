@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Add a loop-based `Power(base, exp int) int` function in `main.go` and tests in `main_test.go` for the specified cases.",
+  "summary": "Verify Update the Go codebase by adding a `Power` helper in `main.go` that computes integer exponentiation with a simple loop and no `math.Pow` usage, then add table-style or direct unit tests in `main_test.go` covering the required inputs and outputs. Finish by running the relevant Go test command to confirm the new function compiles and the added cases pass. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-225947.000\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-225947.000\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-225947.000\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-225947.000\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

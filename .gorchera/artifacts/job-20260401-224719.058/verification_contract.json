@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Clarify prompt role hierarchy text in `internal/provider/protocol.go` for leader, worker, planner, and evaluator prompts, then verify with Go build and tests.",
+  "summary": "Verify Update the role-introduction text in `internal/provider/protocol.go` so each orchestration role has explicit hierarchy and responsibility boundaries: leader operates under an orchestrator supervisor and coordinates workers without implementing, worker executes implementation tasks and reports files/commands/errors, and planner/evaluator receive parallel hierarchy-oriented descriptions consistent with the system design. After editing, review any related documentation references that should stay aligned with prompt semantics, then run `go build ./...` and `go test ./...` to confirm the prompt text change does not break compilation or existing behavior. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-224719.058\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-224719.058\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-224719.058\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-224719.058\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

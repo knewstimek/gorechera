@@ -1,0 +1,71 @@
+{
+  "goal": "Add per-role model selection support to the Codex adapter and verify it with build/test.",
+  "tech_stack": "Go, Codex CLI integration, provider/session routing, Go test",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Update the Codex provider path so it mirrors the Claude adapter’s role-profile handling: resolve the execution profile for leader/planner/evaluator/worker in the Codex adapter entrypoints, pass that profile or its model into `runStructured`, and append `--model` to `codex exec` only when the resolved model is a Codex/GPT model and not a Claude shorthand such as `opus`, `sonnet`, or `haiku`. Add focused unit coverage for model flag injection and suppression cases, update the relevant status/architecture docs to reflect Codex per-role model selection, and finish with `go build ./...` plus `go test ./...`.",
+  "product_scope": [
+    "Codex adapter argument construction in `internal/provider/codex.go`",
+    "Role-profile model propagation for Codex leader/planner/evaluator/worker execution",
+    "A helper `isCodexModel(model string) bool` to gate Codex `--model` usage",
+    "Provider tests covering `--model` inclusion and exclusion behavior",
+    "Documentation updates reflecting Codex per-role model support",
+    "Repository verification via `go build ./...` and `go test ./...`"
+  ],
+  "non_goals": [
+    "Changing Claude adapter behavior beyond preserving compatibility",
+    "Adding new provider interface methods or redesigning session routing unless required for the minimal fix",
+    "Changing default role profile values in `internal/domain/types.go`",
+    "Expanding provider fallback, billing, auth, or retry behavior",
+    "Implementing broader model alias normalization outside the Codex gating needed for this task"
+  ],
+  "proposed_steps": [
+    "Inspect `internal/provider/codex.go`, `internal/provider/claude.go`, and current provider tests to mirror the existing Claude profile flow with the smallest Codex-only change surface.",
+    "Modify Codex `RunLeader`, `RunPlanner`, `RunEvaluator`, and `RunWorker` so each resolves the correct role profile from `job.RoleProfiles` and passes it into `runStructured` instead of calling `runStructured` without model context.",
+    "Extend Codex `runStructured` to accept the resolved profile or model string, add `isCodexModel(model string) bool`, and append `--model \u003cname\u003e` only when the model is non-empty and allowed for Codex; suppress the flag for Claude shorthand models such as `opus`, `sonnet`, and `haiku`.",
+    "Keep the implementation cross-platform and localized to provider code; avoid mixing harness semantics or changing unrelated orchestration behavior.",
+    "Add or update unit tests in `internal/provider/provider_test.go` to assert that Codex receives `--model` for GPT-style models, omits it for empty model strings, and omits it for Claude shorthand role models routed through the Codex adapter.",
+    "Update the relevant docs, at minimum the implementation status entry for the Codex adapter, so the documented behavior matches the new per-role model-selection support.",
+    "Run `go build ./...` and `go test ./...` and capture the pass/fail result as final verification evidence."
+  ],
+  "success_signals": [
+    "A Codex adapter test inspects constructed args and finds `--model` only for GPT-style inputs.",
+    "A Codex adapter test using role profiles like planner=`opus` or executor=`sonnet` passes without expecting a `--model` flag.",
+    "No provider-interface regression appears in existing planner/evaluator/worker tests.",
+    "The implementation status doc no longer understates Codex model-selection capability.",
+    "Both repository-wide verification commands complete successfully."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that Codex provider executions honor role-profile model selection without passing Claude shorthand models to `codex exec`, and that the repo still builds and tests cleanly.",
+    "scope": [
+      "Codex adapter role-profile handling",
+      "Codex CLI `--model` gating",
+      "Provider unit tests for model flag behavior",
+      "Documentation alignment for Codex adapter capabilities"
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\codex.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\provider_test.go",
+      "D:\\News\\Business\\AIOrchestrator\\docs\\IMPLEMENTATION_STATUS.md"
+    ],
+    "required_checks": [
+      "Confirm Codex leader/planner/evaluator/worker paths use the resolved role profile model.",
+      "Confirm `isCodexModel` accepts empty and GPT-style model names and rejects Claude shorthand names for Codex flag injection.",
+      "Confirm test coverage asserts both `--model` inclusion and suppression cases.",
+      "Confirm build and test commands pass from the workspace root."
+    ],
+    "disallowed_actions": [
+      "Do not change evaluator gate semantics.",
+      "Do not modify Claude adapter behavior unless required for compatibility.",
+      "Do not redesign provider/session interfaces beyond the minimal wiring needed for this feature.",
+      "Do not skip `go build ./...` or `go test ./...` verification."
+    ],
+    "max_seconds": 1200,
+    "notes": "Prefer the minimal implementation pattern already used by `internal/provider/claude.go`: keep role-profile resolution close to the adapter entrypoints unless a broader provider API change is strictly necessary.",
+    "owner_role": "planner"
+  }
+}

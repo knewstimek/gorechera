@@ -1,0 +1,153 @@
+{
+  "id": "job-20260401-224719.058",
+  "goal": "Improve leader prompt role hierarchy clarity. In internal/provider/protocol.go buildLeaderPrompt, update the opening instruction text to explicitly state: \"You are a leader component operating under an orchestrator supervisor. The supervisor agent monitors your decisions via MCP tools and may inject [SUPERVISOR] directives into the leader context. You coordinate workers (executor, reviewer, tester) but do not perform implementation yourself.\" Also in buildWorkerPrompt, add: \"You are an executor worker assigned by the leader. You perform the implementation task described below. Report results accurately including files changed, commands run, and any errors encountered.\" Also in buildPlannerPrompt and buildEvaluatorPrompt, add similar role-hierarchy descriptions. Run go build ./... and go test ./... to verify.",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "strictness_level": "normal",
+  "context_mode": "full",
+  "role_profiles": {
+    "planner": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "codex",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that role-hierarchy prompt text was updated correctly in `internal/provider/protocol.go` and that the repository still builds and tests cleanly.",
+    "scope": [
+      "Prompt text changes for leader, worker, planner, and evaluator roles.",
+      "Build and test verification from the workspace root.",
+      "Documentation consistency only where directly impacted by the prompt text change."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go",
+      ".gorechera\\artifacts\\job-20260401-224719.058\\verification_contract.json"
+    ],
+    "required_checks": [
+      "Confirm `buildLeaderPrompt` contains the explicit supervisor-monitoring and non-implementation wording.",
+      "Confirm `buildWorkerPrompt` contains executor assignment and reporting expectations.",
+      "Confirm `buildPlannerPrompt` and `buildEvaluatorPrompt` include analogous hierarchy descriptions.",
+      "Confirm build command succeeds without errors.",
+      "Confirm test command succeeds without failures."
+    ],
+    "disallowed_actions": [
+      "Do not change orchestration logic beyond prompt text and directly related wording cleanup.",
+      "Do not bypass evaluator-gate, approval, or harness principles.",
+      "Do not introduce Windows-specific behavior into core logic.",
+      "Do not modify unrelated adapters, state-machine behavior, or roadmap features."
+    ],
+    "max_seconds": 1200,
+    "notes": "Keep edits minimal and localized. If documentation does not explicitly cover these prompt introductions, no doc change is required beyond preserving consistency with repository standards.",
+    "owner_role": "planner"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-224719.058\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-224719.058\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-224719.058\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-224719.058\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-224719.058\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-224719.058\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-224719.058\\evaluator_report.json",
+  "status": "done",
+  "provider": "codex",
+  "max_steps": 8,
+  "current_step": 1,
+  "retry_count": 0,
+  "summary": "The required implementation step succeeded and the goal is fully achieved. `internal/provider/protocol.go` was updated with the requested role-hierarchy wording for leader, worker, planner, and evaluator prompts. Documentation was reviewed for direct impact and left unchanged. Verification commands `go build ./...` and `go test ./...` both succeeded from the workspace root, satisfying the verification contract and sprint thresholds.",
+  "leader_context_summary": "The job state includes a succeeded implement step that directly covers the requested prompt-text updates in `internal/provider/protocol.go` and reports successful `go build ./...` and `go test ./...` verification.",
+  "token_usage": {
+    "input_tokens": 8805,
+    "output_tokens": 2845,
+    "total_tokens": 11650,
+    "estimated_cost_usd": 0.01165
+  },
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Update `D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go` with minimal localized prompt-text edits only. In `buildLeaderPrompt`, replace the opening instruction text so it explicitly states: \"You are a leader component operating under an orchestrator supervisor. The supervisor agent monitors your decisions via MCP tools and may inject [SUPERVISOR] directives into the leader context. You coordinate workers (executor, reviewer, tester) but do not perform implementation yourself.\" In `buildWorkerPrompt`, add: \"You are an executor worker assigned by the leader. You perform the implementation task described below. Report results accurately including files changed, commands run, and any errors encountered.\" In `buildPlannerPrompt` and `buildEvaluatorPrompt`, add analogous role-hierarchy wording consistent with the system design and existing prompt style. Do not change orchestration logic beyond prompt text and directly related wording cleanup. Review `docs/` only for direct consistency impact; if no explicit doc update is needed, leave docs unchanged. After editing, run `go build ./...` and `go test ./...` from `D:\\News\\Business\\AIOrchestrator` and report results accurately, including files changed, commands run, and any errors encountered.",
+      "status": "succeeded",
+      "summary": "Updated role-hierarchy prompt text in D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go with minimal localized string edits only. buildLeaderPrompt now includes the explicit orchestrator supervisor / MCP monitoring / [SUPERVISOR] / non-implementation wording requested. buildWorkerPrompt now states the executor assignment and reporting expectations. buildPlannerPrompt and buildEvaluatorPrompt now include analogous hierarchy descriptions consistent with existing role boundaries. Docs were reviewed for direct consistency impact and left unchanged. Commands run: `go build ./...` succeeded, then `go test ./...` succeeded. Errors encountered: none after rerunning `go build ./...` with login shell disabled to avoid a PowerShell profile warning unrelated to the build result.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-224719.058\\step-01-protocol.go"
+      ],
+      "token_usage": {
+        "input_tokens": 6850,
+        "output_tokens": 878,
+        "total_tokens": 7728,
+        "estimated_cost_usd": 0.0077280000000000005
+      },
+      "started_at": "2026-04-01T22:48:03.6423406Z",
+      "finished_at": "2026-04-01T22:49:08.1508601Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T22:47:19.0581389Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T22:47:51.7350531Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T22:47:51.7360464Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T22:48:03.6423406Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T22:49:08.1508601Z",
+      "kind": "worker_succeeded",
+      "message": "Updated role-hierarchy prompt text in D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go with minimal localized string edits only. buildLeaderPrompt now includes the explicit orchestrator supervisor / MCP monitoring / [SUPERVISOR] / non-implementation wording requested. buildWorkerPrompt now states the executor assignment and reporting expectations. buildPlannerPrompt and buildEvaluatorPrompt now include analogous hierarchy descriptions consistent with existing role boundaries. Docs were reviewed for direct consistency impact and left unchanged. Commands run: `go build ./...` succeeded, then `go test ./...` succeeded. Errors encountered: none after rerunning `go build ./...` with login shell disabled to avoid a PowerShell profile warning unrelated to the build result."
+    },
+    {
+      "time": "2026-04-01T22:49:08.1518529Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T22:49:39.114846Z",
+      "kind": "evaluation_passed",
+      "message": "The job state includes a succeeded implement step that directly covers the requested prompt-text updates in `internal/provider/protocol.go` and reports successful `go build ./...` and `go test ./...` verification."
+    },
+    {
+      "time": "2026-04-01T22:49:39.1158386Z",
+      "kind": "job_completed",
+      "message": "The required implementation step succeeded and the goal is fully achieved. `internal/provider/protocol.go` was updated with the requested role-hierarchy wording for leader, worker, planner, and evaluator prompts. Documentation was reviewed for direct impact and left unchanged. Verification commands `go build ./...` and `go test ./...` both succeeded from the workspace root, satisfying the verification contract and sprint thresholds."
+    }
+  ],
+  "created_at": "2026-04-01T22:47:19.0581389Z",
+  "updated_at": "2026-04-01T22:49:39.1158386Z"
+}

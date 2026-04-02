@@ -1,0 +1,173 @@
+{
+  "id": "job-20260401-225951.800",
+  "goal": "Audit the recent self-improvement changes in this codebase. DO NOT modify any files. Read and analyze: internal/orchestrator/service.go (focus on classifyWorkerFailure, consecutiveSummarizes, workspace validation, completionRetryPending), internal/provider/protocol.go (focus on buildLeaderJobPayload summary/minimal modes, SUPERVISOR rule), internal/mcp/server.go (focus on validateWorkspaceDir, toolSteer, gorechera_steer). Report: (1) any logical errors or edge cases that could cause bugs, (2) any security concerns, (3) any dead code or unused functions, (4) inconsistencies between the different code paths. Output your findings as the worker summary.",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "strictness_level": "lenient",
+  "context_mode": "minimal",
+  "role_profiles": {
+    "planner": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "codex",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that a read-only audit of the requested self-improvement changes was completed and that the resulting worker summary is actionable, scoped, and evidence-based.",
+    "scope": [
+      "Targeted review of `internal/orchestrator/service.go` focus areas.",
+      "Targeted review of `internal/provider/protocol.go` focus areas.",
+      "Targeted review of `internal/mcp/server.go` focus areas.",
+      "Immediate helper logic only where needed to validate the above flows."
+    ],
+    "required_commands": [
+      "Read the named files and inspect the specific functions/branches called out in the job goal.",
+      "Use targeted search/read commands to trace related helper logic for completion evaluation, step-status handling, and shared validation behavior."
+    ],
+    "required_artifacts": [
+      ".gorechera\\artifacts\\job-20260401-225951.800\\product_spec.md",
+      ".gorechera\\artifacts\\job-20260401-225951.800\\execution_plan.json",
+      ".gorechera\\artifacts\\job-20260401-225951.800\\sprint_contract.json",
+      ".gorechera\\artifacts\\job-20260401-225951.800\\verification_contract.json"
+    ],
+    "required_checks": [
+      "Confirm the summary includes findings or explicit no-findings statements for all four requested categories.",
+      "Confirm every finding is tied to a specific file path and relevant function or branch.",
+      "Confirm no files were modified during execution.",
+      "Confirm the audit stayed within the requested scope except for directly related helper code needed for validation."
+    ],
+    "disallowed_actions": [
+      "Modifying source files or docs.",
+      "Creating remediation patches.",
+      "Expanding into a general codebase review outside the requested paths.",
+      "Claiming a security issue without a concrete code-path explanation."
+    ],
+    "max_seconds": 900,
+    "notes": "Primary deliverable is the worker summary itself; no repository artifact needs to be created. Prefer reviewer-style output with severity ordering and concise evidence.",
+    "owner_role": "reviewer"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-225951.800\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-225951.800\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-225951.800\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-225951.800\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-225951.800\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-225951.800\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-225951.800\\evaluator_report.json",
+  "status": "done",
+  "provider": "codex",
+  "max_steps": 4,
+  "current_step": 2,
+  "retry_count": 0,
+  "summary": "Read-only audit complete. Findings:\n\n1. High - supervisor prompt injection via worker/system summaries. `internal/orchestrator/service.go:724`, `:821`, `:850` copy untrusted summaries/block reasons into `job.LeaderContextSummary`, while `internal/provider/protocol.go:243` and `:275-276` tell the leader to obey any `[SUPERVISOR]` directive in that context with highest priority. A worker can emit `[SUPERVISOR] ...` and impersonate the supervisor on the next leader turn.\n\n2. High - workspace validation is too weak in both orchestrator and MCP paths. `internal/orchestrator/service.go:103-118` and `internal/mcp/server.go:144-159` only check existence and `IsDir`; they do not require an absolute path, canonicalize symlinks, or enforce containment under the intended workspace root. That conflicts with the documented absolute-path contract and allows arbitrary external directories to be passed through to provider adapters.\n\n3. High - `gorechera_steer` is effectively a privileged prompt-injection channel. `internal/mcp/server.go:327-336` and `:650-663` accept steering text and `internal/orchestrator/service.go:950-967` prepends it as `[SUPERVISOR]` without ownership, authorization, or job-status checks. In a shared deployment, any caller with a `job_id` can hijack leader behavior.\n\n4. High - `gorechera_steer` does not reliably satisfy its own contract. MCP says the next leader call will see the directive (`internal/mcp/server.go:327-328`), but `Service.Steer` only writes `LeaderContextSummary` (`internal/orchestrator/service.go:950-959`). If a worker/system step finishes before the next leader turn, `runWorkerStep` / `runSystemStepWithApproval` overwrite that field (`internal/orchestrator/service.go:727`, `:824`), silently dropping the directive.\n\n5. Medium - `completionRetryPending` can leave stale blocked state and persistence gaps. After evaluator-blocked completion, only `run_worker` / `run_workers` / `run_system` clear blocked state (`internal/orchestrator/service.go:522-547`). `summarize` does not (`internal/orchestrator/service.go:554-561`). If the leader immediately chooses `complete` again, `internal/orchestrator/service.go:563-566` returns blocked without `touch`/`SaveJob`, so persisted state can remain inconsistent.\n\n6. Medium - `classifyWorkerFailure` often misses schema-validation failures. Validator errors originate as field-level messages from `internal/schema/validate.go:129-142`, but `internal/orchestrator/service.go:1021-1064` mainly recognizes JSON unmarshal errors or strings containing literal `schema validation`. The branch that handles schema failure at `internal/orchestrator/service.go:673-684` therefore usually loses structured classification.\n\n7. Medium - reduced leader payload modes distort state. In `internal/provider/protocol.go:352-361`, minimal mode counts every non-succeeded/non-failed step as `active`, so blocked/skipped steps are misreported. In `internal/provider/protocol.go:327-330`, summary mode truncates by bytes (`summary[:80]`), which can split UTF-8 and corrupt multibyte text.\n\n8. Medium - payload-size control is inconsistent with steering behavior. `internal/provider/protocol.go:281-296` presents summary/minimal modes as size-reduction paths, but both still include `LeaderContextSummary` verbatim (`internal/provider/protocol.go:338`, `:387`). Combined with unbounded steer input, large or repeated directives can defeat the compression goal.\n\n9. Medium - worker failure semantics differ by execution path. In the single-worker path, `worker.Status == \"failed\"` leaves the job running and returns control to the leader (`internal/orchestrator/service.go:714-724`). In the parallel path, the same worker status fails the entire job (`internal/orchestrator/parallel.go:301-320`). Recovery behavior therefore depends on whether the leader used `run_worker` or `run_workers`.\n\nSecurity concerns:\n- Items 1, 2, 3, and 4 are concrete security issues: supervisor impersonation, arbitrary workspace selection, unauthenticated steering, and unreliable steering delivery.\n\nDead code / unused functions:\n- No clear dead or unused functions found in the audited scope.\n- `validateWorkspaceDir` is duplicated in `internal/orchestrator/service.go` and `internal/mcp/server.go`; both copies are used, so this is not dead code, but it is drift-prone duplication.\n\nCross-path inconsistencies:\n- `gorechera_steer` promises “running job” / “next leader call will see this directive” (`internal/mcp/server.go:327-328`), but `toolSteer`/`Service.Steer` do not enforce running state and do not preserve the directive until a leader turn.\n- The two `validateWorkspaceDir` copies already diverge in diagnostics: MCP uses `os.IsNotExist` and `failed to access workspace directory` (`internal/mcp/server.go:149-155`), while orchestrator uses `errors.Is(err, os.ErrNotExist)` and `stat workspace directory` (`internal/orchestrator/service.go:109-115`).\n- Provider payload compression and steering behavior conflict because supervisor text bypasses the intended summary/minimal reduction.\n- Single-worker and parallel worker-failure handling are inconsistent as noted above.\n\nFiles changed: none.",
+  "leader_context_summary": "Succeeded review steps cover the read-only audit goal and provide actionable, evidence-based findings across the requested files and categories without modifying files.",
+  "token_usage": {
+    "input_tokens": 18127,
+    "output_tokens": 6386,
+    "total_tokens": 24513,
+    "estimated_cost_usd": 0.024513
+  },
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "review",
+      "task_text": "Read-only audit `internal/orchestrator/service.go` and `internal/provider/protocol.go`. Focus on `classifyWorkerFailure`, `consecutiveSummarizes`, workspace validation handling, `completionRetryPending`, `buildLeaderJobPayload` summary/minimal modes, and the `SUPERVISOR` rule. Report concrete findings with file/line references covering: (1) logical errors or edge cases that could cause bugs, (2) security concerns, (3) dead code or unused functions, and (4) inconsistencies between these code paths. Do not modify files.",
+      "status": "succeeded",
+      "summary": "Scope: read-only audit of `internal/orchestrator/service.go` and `internal/provider/protocol.go`, plus immediate helpers in `internal/orchestrator/evaluator.go`, `internal/orchestrator/parallel.go`, `internal/orchestrator/planning.go`, and `internal/schema/validate.go` needed to validate the named flows.\n\nFindings:\n1. High - supervisor prompt injection is possible. `service.go:724`, `service.go:821`, and `service.go:850` copy untrusted worker/system summaries and block reasons into `job.LeaderContextSummary`, while `protocol.go:243` and `protocol.go:275-276` tell the leader to obey any `[SUPERVISOR]` directive in that context with highest priority. Because real supervisor steering uses the same prefix in `service.go:952-957`, a worker can emit a summary starting with `[SUPERVISOR] ...` and impersonate the supervisor on the next leader turn.\n2. High - workspace validation is too weak for containment and also breaks prompt assumptions. `service.go:103-118` only checks existence and `IsDir`; it does not require an absolute path, canonicalize symlinks, or constrain the path to `s.workspaceRoot`. That caller-supplied value is persisted at `service.go:135` and `service.go:176`, then trusted by `buildSystemRequest`/`classifyScope` at `service.go:1202-1267`. Result: a job can point at any existing directory and system actions will still be classified as workspace-local relative to that supplied root. This also conflicts with the planner prompt requirement for an absolute `workspace_dir` in `protocol.go:169`.\n3. Medium - `completionRetryPending` can leave persisted state inconsistent. After an evaluator-blocked completion, only `run_worker`/`run_workers`/`run_system` clear stale blocked state (`service.go:522-547`). `summarize` does not (`service.go:554-561`), so a waiting-leader job can be saved with an old `BlockedReason`. Worse, if the leader chooses `complete` again without adding steps, `service.go:563-566` returns a blocked job without `touch` or `SaveJob`, so persisted state can remain at the last saved waiting-leader snapshot.\n4. Medium - schema-validation failures often lose structured classification. In the schema-failure branch (`service.go:673-684`), the actual validator errors come from `internal/schema/validate.go:129-142` as field-level messages like `summary is required` or `blocked requires blocked_reason`. `classifyWorkerFailure` (`service.go:1021-1064`) only detects JSON-unmarshal errors or strings containing literal `schema validation`, so `StructuredReason` is usually `nil` in the very code path intended to classify schema violations.\n5. Medium - reduced leader payloads distort state. In `protocol.go:352-361`, minimal mode counts every non-succeeded/non-failed step as `active`, so blocked and skipped steps are misreported. In `protocol.go:327-330`, summary mode truncates by bytes (`summary[:80]`), which can split UTF-8 and corrupt Korean or other multibyte summaries.\n6. Medium - worker-failure semantics are inconsistent across code paths. In the single-worker path, `worker.Status == \"failed\"` leaves `job.Status` as running and returns control to the leader (`service.go:714-724`). In the parallel path, the same worker status escalates the whole job to failed (`parallel.go:301-320`). That makes completion/recovery behavior differ depending only on whether the leader used `run_worker` or `run_workers`.\n\nSecurity concerns: items 1 and 2 above are concrete security issues. No additional security issue in the audited scope was strong enough to report beyond those.\n\nDead code / unused: no dead or obviously unused functions were identified in the audited scope. The inspected helpers (`validateWorkspaceDir`, `blockedReasonStrikeCount`, `blockedEventReason`, `isJSONUnmarshalError`, `buildSummaryPayload`, `buildMinimalPayload`, `writeSchemaFile`) are all referenced.\n\nCommands run: `git status --short`; `rg -n \"classifyWorkerFailure|consecutiveSummarizes|completionRetryPending|workspace|buildLeaderJobPayload|SUPERVISOR\" ...`; targeted `Get-Content` reads for the cited files/functions; `rg` lookups for helper references.\n\nFiles changed: none by this worker.\n\nErrors encountered: every PowerShell invocation emitted a profile execution-policy warning for `Microsoft.PowerShell_profile.ps1`; `git status` also warned that `C:\\Users\\News/.config/git/ignore` was inaccessible. The read commands still succeeded. The workspace was not stable across the two `git status` snapshots: it initially showed two untracked `gorechera-provider-*` directories and later one, indicating external/concurrent changes outside this worker.",
+      "token_usage": {
+        "input_tokens": 1844,
+        "output_tokens": 1211,
+        "total_tokens": 3055,
+        "estimated_cost_usd": 0.003055
+      },
+      "started_at": "2026-04-01T23:01:39.3883604Z",
+      "finished_at": "2026-04-01T23:05:49.0651785Z"
+    },
+    {
+      "index": 2,
+      "target": "C",
+      "task_type": "review",
+      "task_text": "Read-only audit `internal/mcp/server.go` with emphasis on `validateWorkspaceDir`, `toolSteer`, and `gorechera_steer`, then cross-compare their behavior against the orchestrator/provider paths named in the job. Report concrete findings with file/line references covering: (1) logical errors or edge cases that could cause bugs, (2) security concerns, (3) dead code or unused functions, and (4) inconsistencies between different code paths. Do not modify files.",
+      "status": "succeeded",
+      "summary": "Logical errors / edge cases:\n- High: `gorechera_steer` can silently lose a supervisor directive before the next leader turn. The MCP tool promises the next leader call will see the directive (`internal/mcp/server.go:327-328`), but `Service.Steer` only prepends it to `job.LeaderContextSummary` (`internal/orchestrator/service.go:950-959`). If a worker or system step is still running, that field is later overwritten by `runWorkerStep` / `runSystemStepWithApproval` (`internal/orchestrator/service.go:727`, `internal/orchestrator/service.go:824`) before the leader runs again.\n- Medium: `gorechera_steer` reports success for non-running jobs even though the tool contract says it targets a running job (`internal/mcp/server.go:327-328`). `toolSteer` and `Service.Steer` do not check job status (`internal/mcp/server.go:650-663`, `internal/orchestrator/service.go:950-967`), so a `done`/`failed` job can be marked `steered` even when no future leader call exists.\n- Medium: summary/minimal payload modes are not actually bounded for supervisor text. `buildLeaderJobPayload` advertises payload-size control (`internal/provider/protocol.go:281-296`), but both compressed modes copy `LeaderContextSummary` verbatim (`internal/provider/protocol.go:338`, `internal/provider/protocol.go:387`). Combined with unbounded steer input (`internal/mcp/server.go:332-335`, `internal/mcp/server.go:650-663`; `internal/orchestrator/service.go:955-959`), repeated or large directives can defeat the “summary/minimal” sizing goal.\n\nSecurity concerns:\n- High: `gorechera_steer` is a privileged prompt-injection channel with no authorization, ownership, or status checks. Any MCP caller that knows a `job_id` can inject a `[SUPERVISOR]` directive (`internal/mcp/server.go:327-336`, `internal/mcp/server.go:650-663`; `internal/orchestrator/service.go:950-967`), and the leader prompt explicitly says such directives have highest priority (`internal/provider/protocol.go:243-275`). In a shared/server deployment, that is effective job hijacking.\n- Medium: `workspace_dir` is documented as an absolute path (`internal/mcp/server.go:221-225`), but both validators only check existence, not absoluteness or containment (`internal/mcp/server.go:144-159`, `internal/orchestrator/service.go:104-119`). That lets callers supply relative paths or arbitrary external directories, which are then passed as working directories to provider adapters (`internal/provider/codex.go:39`, `internal/provider/codex.go:46`, `internal/provider/codex.go:53`, `internal/provider/codex.go:60`, `internal/provider/claude.go:40`, `internal/provider/claude.go:47`, `internal/provider/claude.go:54`, `internal/provider/claude.go:61`).\n\nDead code / unused functions:\n- No clear dead code found in the reviewed scope.\n- `validateWorkspaceDir` is duplicated in `internal/mcp/server.go:144-159` and `internal/orchestrator/service.go:104-119`; both copies are used, so this is not dead code, but it is drift-prone duplication.\n\nInconsistencies between code paths:\n- `gorechera_steer` says “running job” / “next leader call will see this directive” (`internal/mcp/server.go:327-328`), but the service layer accepts any job state and does not preserve the directive until a leader turn (`internal/orchestrator/service.go:950-967`, `internal/orchestrator/service.go:727`, `internal/orchestrator/service.go:824`).\n- The two `validateWorkspaceDir` copies already diverge in error handling and messages: MCP uses `os.IsNotExist` and `failed to access workspace directory` (`internal/mcp/server.go:149-155`), while orchestrator uses `errors.Is(err, os.ErrNotExist)` and `stat workspace directory` (`internal/orchestrator/service.go:109-115`). Same input can surface different diagnostics depending on entry path.\n- Provider prompt construction says summary/minimal modes control payload size (`internal/provider/protocol.go:281-296`), but supervisor steering bypasses that compression because `LeaderContextSummary` is always included verbatim in both compressed payloads (`internal/provider/protocol.go:338`, `internal/provider/protocol.go:387`).\n\nCommands run: targeted `grep`/`read` inspection on `internal/mcp/server.go`, `internal/orchestrator/service.go`, `internal/orchestrator/evaluator.go`, `internal/provider/protocol.go`, and provider adapter files.\nFiles changed: none.\nErrors encountered: none.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-225951.800\\step-02-Files-changed--none",
+        ".gorechera\\artifacts\\job-20260401-225951.800\\step-02-claude.go",
+        ".gorechera\\artifacts\\job-20260401-225951.800\\step-02-Errors-encountered--none"
+      ],
+      "token_usage": {
+        "input_tokens": 14452,
+        "output_tokens": 3195,
+        "total_tokens": 17647,
+        "estimated_cost_usd": 0.017647
+      },
+      "started_at": "2026-04-01T23:01:39.3883604Z",
+      "finished_at": "2026-04-01T23:05:49.0651785Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T22:59:51.8005304Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T23:01:21.6961747Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T23:01:21.6981618Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:01:39.3883604Z",
+      "kind": "parallel_workers_requested",
+      "message": "parallel fan-out with 2 workers"
+    },
+    {
+      "time": "2026-04-01T23:05:49.0651785Z",
+      "kind": "parallel_workers_succeeded",
+      "message": "parallel fan-out with 2 workers completed"
+    },
+    {
+      "time": "2026-04-01T23:05:49.0661716Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:06:44.2342497Z",
+      "kind": "evaluation_passed",
+      "message": "Succeeded review steps cover the read-only audit goal and provide actionable, evidence-based findings across the requested files and categories without modifying files."
+    },
+    {
+      "time": "2026-04-01T23:06:44.2352431Z",
+      "kind": "job_completed",
+      "message": "Read-only audit complete. Findings:\n\n1. High - supervisor prompt injection via worker/system summaries. `internal/orchestrator/service.go:724`, `:821`, `:850` copy untrusted summaries/block reasons into `job.LeaderContextSummary`, while `internal/provider/protocol.go:243` and `:275-276` tell the leader to obey any `[SUPERVISOR]` directive in that context with highest priority. A worker can emit `[SUPERVISOR] ...` and impersonate the supervisor on the next leader turn.\n\n2. High - workspace validation is too weak in both orchestrator and MCP paths. `internal/orchestrator/service.go:103-118` and `internal/mcp/server.go:144-159` only check existence and `IsDir`; they do not require an absolute path, canonicalize symlinks, or enforce containment under the intended workspace root. That conflicts with the documented absolute-path contract and allows arbitrary external directories to be passed through to provider adapters.\n\n3. High - `gorechera_steer` is effectively a privileged prompt-injection channel. `internal/mcp/server.go:327-336` and `:650-663` accept steering text and `internal/orchestrator/service.go:950-967` prepends it as `[SUPERVISOR]` without ownership, authorization, or job-status checks. In a shared deployment, any caller with a `job_id` can hijack leader behavior.\n\n4. High - `gorechera_steer` does not reliably satisfy its own contract. MCP says the next leader call will see the directive (`internal/mcp/server.go:327-328`), but `Service.Steer` only writes `LeaderContextSummary` (`internal/orchestrator/service.go:950-959`). If a worker/system step finishes before the next leader turn, `runWorkerStep` / `runSystemStepWithApproval` overwrite that field (`internal/orchestrator/service.go:727`, `:824`), silently dropping the directive.\n\n5. Medium - `completionRetryPending` can leave stale blocked state and persistence gaps. After evaluator-blocked completion, only `run_worker` / `run_workers` / `run_system` clear blocked state (`internal/orchestrator/service.go:522-547`). `summarize` does not (`internal/orchestrator/service.go:554-561`). If the leader immediately chooses `complete` again, `internal/orchestrator/service.go:563-566` returns blocked without `touch`/`SaveJob`, so persisted state can remain inconsistent.\n\n6. Medium - `classifyWorkerFailure` often misses schema-validation failures. Validator errors originate as field-level messages from `internal/schema/validate.go:129-142`, but `internal/orchestrator/service.go:1021-1064` mainly recognizes JSON unmarshal errors or strings containing literal `schema validation`. The branch that handles schema failure at `internal/orchestrator/service.go:673-684` therefore usually loses structured classification.\n\n7. Medium - reduced leader payload modes distort state. In `internal/provider/protocol.go:352-361`, minimal mode counts every non-succeeded/non-failed step as `active`, so blocked/skipped steps are misreported. In `internal/provider/protocol.go:327-330`, summary mode truncates by bytes (`summary[:80]`), which can split UTF-8 and corrupt multibyte text.\n\n8. Medium - payload-size control is inconsistent with steering behavior. `internal/provider/protocol.go:281-296` presents summary/minimal modes as size-reduction paths, but both still include `LeaderContextSummary` verbatim (`internal/provider/protocol.go:338`, `:387`). Combined with unbounded steer input, large or repeated directives can defeat the compression goal.\n\n9. Medium - worker failure semantics differ by execution path. In the single-worker path, `worker.Status == \"failed\"` leaves the job running and returns control to the leader (`internal/orchestrator/service.go:714-724`). In the parallel path, the same worker status fails the entire job (`internal/orchestrator/parallel.go:301-320`). Recovery behavior therefore depends on whether the leader used `run_worker` or `run_workers`.\n\nSecurity concerns:\n- Items 1, 2, 3, and 4 are concrete security issues: supervisor impersonation, arbitrary workspace selection, unauthenticated steering, and unreliable steering delivery.\n\nDead code / unused functions:\n- No clear dead or unused functions found in the audited scope.\n- `validateWorkspaceDir` is duplicated in `internal/orchestrator/service.go` and `internal/mcp/server.go`; both copies are used, so this is not dead code, but it is drift-prone duplication.\n\nCross-path inconsistencies:\n- `gorechera_steer` promises “running job” / “next leader call will see this directive” (`internal/mcp/server.go:327-328`), but `toolSteer`/`Service.Steer` do not enforce running state and do not preserve the directive until a leader turn.\n- The two `validateWorkspaceDir` copies already diverge in diagnostics: MCP uses `os.IsNotExist` and `failed to access workspace directory` (`internal/mcp/server.go:149-155`), while orchestrator uses `errors.Is(err, os.ErrNotExist)` and `stat workspace directory` (`internal/orchestrator/service.go:109-115`).\n- Provider payload compression and steering behavior conflict because supervisor text bypasses the intended summary/minimal reduction.\n- Single-worker and parallel worker-failure handling are inconsistent as noted above.\n\nFiles changed: none."
+    }
+  ],
+  "created_at": "2026-04-01T22:59:51.8005304Z",
+  "updated_at": "2026-04-01T23:06:44.2352431Z"
+}

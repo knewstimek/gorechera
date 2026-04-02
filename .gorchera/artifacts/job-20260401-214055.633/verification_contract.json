@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Add rough token and cost tracking to orchestrator job and step state, with accumulation after each provider call and build/test verification.",
+  "summary": "Verify Update the domain model to introduce a shared TokenUsage structure and embed it on both Job and Step, then extend the orchestrator service to estimate prompt/response token usage after each provider interaction (leader, worker, planner, evaluator), accumulate those estimates onto the current step and overall job, and keep the implementation localized with a helper function for consistent estimation. After code changes, update the relevant documentation to reflect the new tracking behavior and verify the repo still builds and tests cleanly with the standard Go commands. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-214055.633\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-214055.633\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-214055.633\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-214055.633\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

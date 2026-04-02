@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Add token/cost tracking to the orchestrator. In internal/domain/types.go, add a TokenUsage struct (InputTokens, OutputTokens, TotalTokens int, EstimatedCostUSD float64) and add a TokenUsage field to Job and to each Step. In internal/orchestrator/service.go, after each provider call (RunLeader, RunWorker, RunPlanner, RunEvaluator), estimate token usage from the response length (rough estimate: 1 token per 4 chars for input prompt, 1 token per 4 chars for output) and accumulate it on the job and current step. Add a helper function estimateTokens(input, output string) TokenUsage. Run go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

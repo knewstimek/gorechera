@@ -1,0 +1,62 @@
+{
+  "goal": "Plan a read-only audit of the recent self-improvement changes across the targeted orchestrator, provider, and MCP paths, ending in a worker summary of findings.",
+  "tech_stack": "Go, JSON, MCP/JSON-RPC",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Perform a focused read-only audit of the specified code paths, tracing each requested behavior through its adjacent helper logic so the final worker summary can report concrete bugs, security concerns, dead code, and cross-path inconsistencies with file/line references. The work should stay tightly scoped to the named functions and their immediate dependencies, compare equivalent behaviors across orchestrator/provider/MCP layers, and produce a concise findings report rather than any code changes or remediation.",
+  "product_scope": [
+    "Audit [internal/orchestrator/service.go](D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go) with emphasis on `classifyWorkerFailure`, `consecutiveSummarizes`, workspace validation, and `completionRetryPending`.",
+    "Audit [internal/provider/protocol.go](D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go) with emphasis on `buildLeaderJobPayload`, summary/minimal payload modes, and the `[SUPERVISOR]` rule in leader prompting.",
+    "Audit [internal/mcp/server.go](D:\\News\\Business\\AIOrchestrator\\internal\\mcp\\server.go) with emphasis on `validateWorkspaceDir`, `toolSteer`, and `gorechera_steer` behavior.",
+    "Inspect directly related helper logic needed to validate the focused behaviors, especially evaluator completion-gate handling and step-status semantics.",
+    "Produce a worker summary covering logical errors or edge cases, security concerns, dead code or unused functions, and inconsistencies between code paths."
+  ],
+  "non_goals": [
+    "Do not modify any files.",
+    "Do not implement fixes, refactors, or documentation updates.",
+    "Do not broaden the audit into unrelated packages beyond immediate helper paths needed to verify the named logic.",
+    "Do not run build/test solely for this review unless needed to confirm a claimed issue, since the task is analysis-only.",
+    "Do not create new artifacts beyond the worker summary content."
+  ],
+  "proposed_steps": [
+    "Read the targeted regions in `internal/orchestrator/service.go` and trace how leader completion, summarize capping, blocked evaluation retries, worker-failure classification, and workspace validation affect persisted job state.",
+    "Read the targeted regions in `internal/provider/protocol.go` and compare full, summary, and minimal leader payload construction, paying attention to whether prompt rules still match what the leader can actually observe in reduced-context modes.",
+    "Read the targeted regions in `internal/mcp/server.go` and compare MCP-side workspace validation and steering behavior against orchestrator-side behavior, including request handling and response semantics.",
+    "Cross-check immediate helper code that governs the same flows, especially evaluator completion handling and domain step statuses, to confirm whether suspected edge cases are real or only apparent.",
+    "Write a final worker summary with concrete findings grouped into: logical/edge-case bugs, security concerns, dead code or unused paths, and cross-path inconsistencies; include exact file references and explicitly state any category with no findings."
+  ],
+  "success_signals": [
+    "The worker summary references the targeted files directly and cites relevant helper paths only where necessary to justify a finding.",
+    "The findings explain state-machine consequences, not just stylistic concerns.",
+    "The summary calls out mismatches between orchestrator logic, leader prompt expectations, and MCP behavior where they exist.",
+    "If a category has no confirmed findings, the summary says so explicitly instead of omitting it."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that a read-only audit of the requested self-improvement changes was completed and that the resulting worker summary is actionable, scoped, and evidence-based.",
+    "scope": [
+      "Targeted review of `internal/orchestrator/service.go` focus areas.",
+      "Targeted review of `internal/provider/protocol.go` focus areas.",
+      "Targeted review of `internal/mcp/server.go` focus areas.",
+      "Immediate helper logic only where needed to validate the above flows."
+    ],
+    "required_commands": [
+      "Read the named files and inspect the specific functions/branches called out in the job goal.",
+      "Use targeted search/read commands to trace related helper logic for completion evaluation, step-status handling, and shared validation behavior."
+    ],
+    "required_checks": [
+      "Confirm the summary includes findings or explicit no-findings statements for all four requested categories.",
+      "Confirm every finding is tied to a specific file path and relevant function or branch.",
+      "Confirm no files were modified during execution.",
+      "Confirm the audit stayed within the requested scope except for directly related helper code needed for validation."
+    ],
+    "disallowed_actions": [
+      "Modifying source files or docs.",
+      "Creating remediation patches.",
+      "Expanding into a general codebase review outside the requested paths.",
+      "Claiming a security issue without a concrete code-path explanation."
+    ],
+    "max_seconds": 900,
+    "notes": "Primary deliverable is the worker summary itself; no repository artifact needs to be created. Prefer reviewer-style output with severity ordering and concise evidence.",
+    "owner_role": "reviewer"
+  }
+}

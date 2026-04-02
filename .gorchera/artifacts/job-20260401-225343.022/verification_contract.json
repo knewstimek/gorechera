@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Cap repeated leader summarize actions and strengthen the leader prompt so summarize cannot be used as a completion substitute.",
+  "summary": "Verify Update the orchestrator loop to track consecutive leader `summarize` actions, reset that counter on any non-summarize path, and when a third consecutive summarize is attempted, emit `leader_summarize_capped` and route through the existing completion evaluation path as if `complete` had been chosen. In parallel, update the leader prompt text to explicitly forbid repeated summarize use in place of completion. Then verify the change with a full build and test run. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-225343.022\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-225343.022\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-225343.022\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-225343.022\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

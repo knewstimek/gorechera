@@ -1,0 +1,74 @@
+{
+  "goal": "Add per-step artifact diff tracking so successful worker steps capture a git diff summary in orchestrator state.",
+  "tech_stack": "Go, git CLI",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Extend the step domain model with a `DiffSummary` field, then update the orchestrator success path to attempt `git diff --stat` in the workspace after each worker step completes successfully. The implementation should treat missing git or non-repository workspaces as non-fatal and store an empty string in those cases. Update the relevant documentation to reflect the new step metadata and verify the change with the required Go build and test commands.",
+  "product_scope": [
+    "Add `Step.DiffSummary string` to the domain type definition in `internal/domain/types.go`.",
+    "Update `internal/orchestrator/service.go` so the orchestrator computes and stores a diff summary only after a worker step succeeds.",
+    "Use `git diff --stat` against the workspace directory when git is available and the workspace is a git repository.",
+    "Gracefully fall back to an empty `DiffSummary` when git is unavailable or the workspace is not a git repository.",
+    "Update relevant `docs/` content to reflect the new step metadata and behavior.",
+    "Verify the change with `go build ./...` and `go test ./...`."
+  ],
+  "non_goals": [
+    "Implementing full patch capture, file-level snapshots, or persistent artifact storage beyond a summary string.",
+    "Changing evaluator gate behavior, approval semantics, or worker orchestration flow outside the success-path metadata update.",
+    "Adding Windows-specific logic to core orchestration behavior.",
+    "Introducing worker-side diff generation; this remains orchestrator-owned.",
+    "Refactoring unrelated step/domain structures beyond what is necessary for `DiffSummary`.",
+    "Altering git repository state or requiring git initialization for non-repo workspaces."
+  ],
+  "proposed_steps": [
+    "Inspect the current `Step` domain model and the worker-step success flow to identify where step results are finalized and persisted.",
+    "Add `DiffSummary string` to `internal/domain/types.go` and ensure any constructors, copies, or serialization paths continue to behave correctly.",
+    "Implement a small orchestrator-side helper in `internal/orchestrator/service.go` that runs `git diff --stat` in the workspace, returning `\"\"` on non-repo or git-not-found conditions without failing the step.",
+    "Invoke that helper only after a worker step has completed successfully and assign the returned value to `Step.DiffSummary` before the updated step state is stored or emitted.",
+    "Update the relevant documentation under `docs/` so the new per-step diff visibility is described consistently with current architecture/status docs.",
+    "Run `go build ./...` and `go test ./...`, then review outputs to confirm the feature integrates cleanly without regressions."
+  ],
+  "success_signals": [
+    "A completed worker step now carries a populated `DiffSummary` in git-backed workspaces with changes.",
+    "No new failure path is introduced when git is missing or the workspace is outside a repository.",
+    "The orchestrator code clearly keeps diff collection on the success path only.",
+    "Documentation and code agree on the existence and purpose of `DiffSummary`.",
+    "Repository-wide build and test commands pass after the change."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that successful worker steps record a git diff summary when possible, fall back safely to an empty string otherwise, and do not break the build or test suite.",
+    "scope": [
+      "Domain model update for `Step.DiffSummary`.",
+      "Orchestrator success-path diff collection in `internal/orchestrator/service.go`.",
+      "Relevant documentation updates under `docs/`.",
+      "Repository build and test verification."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\domain\\types.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\AIOrchestrator\\docs"
+    ],
+    "required_checks": [
+      "Confirm `Step` includes a `DiffSummary string` field.",
+      "Confirm the orchestrator runs `git diff --stat` only after successful worker steps.",
+      "Confirm non-repo and git-unavailable cases leave `DiffSummary` empty without failing the step.",
+      "Confirm at least one relevant documentation file was updated to describe the feature.",
+      "Confirm `go build ./...` succeeds.",
+      "Confirm `go test ./...` succeeds."
+    ],
+    "disallowed_actions": [
+      "Do not bypass evaluator or completion gates.",
+      "Do not move diff generation into executor/worker logic.",
+      "Do not fail successful steps solely because git is missing or the workspace is not a repository.",
+      "Do not introduce platform-specific core behavior.",
+      "Do not revert unrelated user changes."
+    ],
+    "max_seconds": 900,
+    "notes": "Prefer a small helper for diff collection with explicit graceful fallback handling. Keep behavior cross-platform by relying on the git CLI rather than OS-specific repo inspection.",
+    "owner_role": "tester"
+  }
+}

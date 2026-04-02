@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "goal": "Audit the recent self-improvement changes in this codebase. DO NOT modify any files. Read and analyze: internal/orchestrator/service.go (focus on classifyWorkerFailure, consecutiveSummarizes, workspace validation, completionRetryPending), internal/provider/protocol.go (focus on buildLeaderJobPayload summary/minimal modes, SUPERVISOR rule), internal/mcp/server.go (focus on validateWorkspaceDir, toolSteer, gorechera_steer). Report: (1) any logical errors or edge cases that could cause bugs, (2) any security concerns, (3) any dead code or unused functions, (4) inconsistencies between the different code paths. Output your findings as the worker summary.",
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 0,
+  "threshold_min_steps": 0,
+  "threshold_require_eval": true,
+  "strictness_level": "lenient"
+}

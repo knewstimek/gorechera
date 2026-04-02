@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Fix 5 medium-severity audit findings. DO NOT add new features, only fix:\n\n1. completionRetryPending state: In internal/orchestrator/service.go, in the summarize action handler, clear job.BlockedReason if completionRetryPending is true (same as run_worker/run_workers/run_system do). Also in the \"complete again without new steps\" early return, call s.touch(job) and s.state.SaveJob before returning.\n\n2. classifyWorkerFailure schema detection: In internal/orchestrator/service.go classifyWorkerFailure, also check for strings like \"is required\", \"invalid\", \"validation failed\" in addition to \"schema validation\" and JSON unmarshal errors, to catch field-level validator messages from internal/schema/validate.go.\n\n3. Minimal mode step counting: In internal/provider/protocol.go buildMinimalPayload, add a \"blocked\" counter separate from \"active\". Only count steps with no status or status \"active\" as active. Count \"blocked\" and \"failed\" separately.\n\n4. Summary mode UTF-8 truncation: In internal/provider/protocol.go buildSummaryPayload, when truncating summary to 80 chars, use []rune(summary) instead of summary[:80] to avoid splitting multi-byte characters.\n\n5. Parallel worker failure consistency: In internal/orchestrator/parallel.go, when a worker in parallel fan-out returns status \"failed\", do NOT escalate the entire job to failed. Instead, mark the step as failed and return control to the leader (same behavior as single-worker path).\n\nRun go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

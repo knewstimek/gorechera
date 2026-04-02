@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Fix the four high-severity audit findings in orchestration and workspace validation logic without adding features.",
+  "summary": "Verify Update the orchestration path handling and steering flow in a narrowly scoped way: sanitize untrusted worker/system text before it reaches leader context, strengthen and centralize workspace validation with absolute-path and symlink resolution checks, restrict Steer to active job states, and preserve supervisor directives in a dedicated job field that is rendered separately in the leader prompt and cleared after consumption. Keep the change set limited to the described fixes, add or update focused tests around the new behaviors, and finish with full `go build` and `go test` verification plus any directly affected documentation adjustments. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-230829.093\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-230829.093\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-230829.093\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-230829.093\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

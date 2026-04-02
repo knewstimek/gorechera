@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "goal": "Add a function called Subtract(a, b int) int to main.go that returns a-b, and add a test for it in main_test.go",
+  "required_step_types": [
+    "implement",
+    "review",
+    "test"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 3,
+  "threshold_min_steps": 3,
+  "threshold_require_eval": true,
+  "strictness_level": "strict"
+}

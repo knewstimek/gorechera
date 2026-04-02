@@ -1,0 +1,71 @@
+{
+  "goal": "Cap repeated leader summarize actions and strengthen the leader prompt so summarize cannot be used as a completion substitute.",
+  "tech_stack": "Go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Update the orchestrator loop to track consecutive leader `summarize` actions, reset that counter on any non-summarize path, and when a third consecutive summarize is attempted, emit `leader_summarize_capped` and route through the existing completion evaluation path as if `complete` had been chosen. In parallel, update the leader prompt text to explicitly forbid repeated summarize use in place of completion. Then verify the change with a full build and test run.",
+  "product_scope": [
+    "Modify `internal/orchestrator/service.go` `runLoop` logic to track and cap consecutive summarize actions.",
+    "Preserve the existing `evaluateCompletion()` gate by forcing capped summarize behavior through the completion path rather than bypassing evaluation.",
+    "Log a `leader_summarize_capped` event when the summarize cap is triggered.",
+    "Update `internal/provider/protocol.go` `buildLeaderPrompt` text with the new summarize/complete rule.",
+    "Run repository-level verification with `go build ./...` and `go test ./...`."
+  ],
+  "non_goals": [
+    "Changing evaluator semantics beyond forcing capped summarize into the existing completion evaluation path.",
+    "Altering unrelated leader action handling, worker dispatch flow, or review/test orchestration behavior.",
+    "Adding new provider protocol structures or changing schema formats outside the prompt text update.",
+    "Refactoring unrelated orchestration loop code.",
+    "Fixing other known bugs or planned Phase 1 Claude adapter work."
+  ],
+  "proposed_steps": [
+    "Inspect `internal/orchestrator/service.go` `runLoop` to identify where leader actions are decoded, where summarize is handled, and where completion evaluation is invoked.",
+    "Introduce a `consecutiveSummarizes` counter in `runLoop`, increment it only on allowed summarize actions, and reset it to `0` on every non-summarize action path that represents worker/system progress or any other leader action.",
+    "When the leader selects `summarize` and `consecutiveSummarizes \u003e= 2`, emit the `leader_summarize_capped` event and branch into the same completion evaluation flow used for `complete` instead of executing another summarize.",
+    "Confirm the forced-complete path still uses `evaluateCompletion()` and does not bypass the evaluator gate or mark the job done directly.",
+    "Update `internal/provider/protocol.go` `buildLeaderPrompt` to include the explicit instruction forbidding summarize as a substitute for complete and forbidding more than one consecutive summarize.",
+    "Review nearby docs/comments if needed for consistency, but keep the change minimal and aligned with existing conventions.",
+    "Run `go build ./...` and `go test ./...`, and address any failures caused by the change.",
+    "Capture the outcome in a concise change summary with the capped summarize behavior, prompt rule update, and verification results."
+  ],
+  "success_signals": [
+    "Code inspection shows `consecutiveSummarizes` in `internal/orchestrator/service.go` with explicit increment/reset logic.",
+    "Event emission for `leader_summarize_capped` is present in the capped branch.",
+    "The capped branch reuses the completion/evaluation flow instead of duplicating or bypassing it.",
+    "`internal/provider/protocol.go` contains the new anti-pattern rule in the leader prompt text.",
+    "Repository build and test commands both return success."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that repeated leader summarize actions are capped into the existing completion evaluation path, the leader prompt forbids summarize abuse, and the repository still builds and tests cleanly.",
+    "scope": [
+      "`internal/orchestrator/service.go` summarize-cap logic in `runLoop`.",
+      "`internal/provider/protocol.go` leader prompt text update.",
+      "Repository verification via Go build and test commands."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go"
+    ],
+    "required_checks": [
+      "Confirm `consecutiveSummarizes` is introduced and reset on non-summarize actions.",
+      "Confirm a third consecutive summarize logs `leader_summarize_capped`.",
+      "Confirm the capped summarize path routes through `evaluateCompletion()` semantics rather than bypassing the evaluator gate.",
+      "Confirm the new leader prompt rule text is present in `buildLeaderPrompt`.",
+      "Confirm both required Go verification commands succeed without errors."
+    ],
+    "disallowed_actions": [
+      "Do not bypass `evaluateCompletion()` when forcing complete behavior.",
+      "Do not pass full conversation logs between agents or alter artifact/summary boundaries.",
+      "Do not introduce executor-side worker spawning behavior.",
+      "Do not mix global harness and job-scoped harness semantics.",
+      "Do not add Windows-specific behavior to core orchestration logic."
+    ],
+    "max_seconds": 1200,
+    "notes": "Keep the implementation narrow and behavior-preserving except for the summarize cap. Prefer reusing existing completion handling to avoid regressions.",
+    "owner_role": "executor"
+  }
+}

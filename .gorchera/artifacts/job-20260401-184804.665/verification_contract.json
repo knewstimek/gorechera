@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Add a `Divide(a, b int) (int, error)` function to `main.go` and add tests for it in `main_test.go`.",
+  "summary": "Verify Inspect the existing Go files to confirm current package structure and test style, then implement `Divide` in `main.go` so it returns integer division for valid inputs and a non-nil error when `b == 0`. Update `main_test.go` with focused tests that cover at least a successful division case and the divide-by-zero error path, then run the relevant Go tests to confirm the behavior and ensure no regressions in the touched files. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-184804.665\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-184804.665\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-184804.665\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-184804.665\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

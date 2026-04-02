@@ -1,0 +1,188 @@
+{
+  "id": "job-20260401-223111.915",
+  "goal": "Improve error feedback for the supervisor agent. Currently when a worker fails or gets blocked, the event message is a free-form string that's hard to act on. Changes needed:\n\n1. In internal/domain/types.go, add a StructuredReason struct with fields: Category string (e.g. \"build_failure\", \"test_failure\", \"file_access\", \"timeout\", \"schema_violation\"), Detail string (what specifically failed), SuggestedAction string (e.g. \"retry\", \"fix_code\", \"check_permissions\", \"increase_timeout\"). Add a StructuredReason field to Step (optional, json omitempty).\n\n2. In internal/orchestrator/service.go, when a worker returns an error or blocked status, populate the StructuredReason by classifying the error. Add a helper function classifyWorkerFailure(err error, workerOutput string) *StructuredReason that checks for common patterns: \"build\" or \"compile\" errors -\u003e build_failure, \"test\" failures -\u003e test_failure, \"permission\" or \"access\" -\u003e file_access, context deadline -\u003e timeout, json unmarshal errors -\u003e schema_violation.\n\n3. In internal/orchestrator/service.go addEvent calls for worker_failed and worker_blocked, include the structured reason in the event message as JSON so the supervisor can parse it.\n\nRun go build ./... and go test ./... to verify.",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "strictness_level": "normal",
+  "context_mode": "full",
+  "role_profiles": {
+    "planner": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "codex",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that worker failure/blocking paths now generate structured, machine-parseable reasons on steps and in emitted events without breaking the Go project.",
+    "scope": [
+      "`internal/domain/types.go` data model changes",
+      "`internal/orchestrator/service.go` worker failure classification and event emission",
+      "Relevant docs if behavior or payload shape is documented",
+      "Repository-wide build and test verification"
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\domain\\types.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go",
+      ".gorechera\\artifacts\\job-20260401-223111.915\\verification_contract.json"
+    ],
+    "required_checks": [
+      "Confirm `StructuredReason` exists with the requested fields.",
+      "Confirm `Step` has an optional structured reason field with `omitempty`.",
+      "Confirm `classifyWorkerFailure` detects build/compile, test, permission/access, context deadline, and JSON unmarshal cases.",
+      "Confirm worker failed/blocked event messages include structured reason JSON.",
+      "Confirm build and test commands pass."
+    ],
+    "disallowed_actions": [
+      "Do not bypass evaluator-gate semantics.",
+      "Do not pass full cross-agent conversation logs instead of artifact plus summary.",
+      "Do not introduce executor-driven worker spawning.",
+      "Do not auto-approve approval-gated work.",
+      "Do not mix global and job-scoped harness semantics.",
+      "Do not add Windows-only logic to core code."
+    ],
+    "max_seconds": 1200,
+    "notes": "Prefer minimal, localized changes and keep event formatting deterministic so the supervisor can parse it reliably.",
+    "owner_role": "executor"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-223111.915\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-223111.915\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-223111.915\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-223111.915\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-223111.915\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-223111.915\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-223111.915\\evaluator_report.json",
+  "status": "done",
+  "provider": "codex",
+  "max_steps": 8,
+  "current_step": 1,
+  "retry_count": 0,
+  "summary": "The required implementation step succeeded, `go build ./...` and `go test ./...` passed, and the sprint contract requires evaluator-gated completion. Choosing `complete` is the correct next action because the system must enforce evaluateCompletion() before finalizing.",
+  "leader_context_summary": "The job state includes a succeeded implement step that directly covers the requested structured failure feedback changes and reports successful build/test verification.",
+  "token_usage": {
+    "input_tokens": 14508,
+    "output_tokens": 3304,
+    "total_tokens": 17812,
+    "estimated_cost_usd": 0.017812
+  },
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Implement the structured worker failure feedback change in D:\\News\\Business\\AIOrchestrator. Update internal/domain/types.go to add StructuredReason with fields Category, Detail, SuggestedAction, and add an optional StructuredReason field to Step with json omitempty. Update internal/orchestrator/service.go to classify worker error/blocked outcomes via a helper classifyWorkerFailure(err error, workerOutput string) *StructuredReason covering build/compile -\u003e build_failure, test -\u003e test_failure, permission/access -\u003e file_access, context deadline -\u003e timeout, and json unmarshal -\u003e schema_violation. When worker returns error or blocked status, populate Step.StructuredReason and ensure worker_failed and worker_blocked addEvent messages include deterministic JSON for the structured reason so the supervisor can parse it. Keep changes minimal and cross-platform. Update docs only if this payload/behavior is documented. Then run go build ./... and go test ./... and report results with changed file paths.",
+      "status": "succeeded",
+      "summary": "Implemented structured worker failure feedback. Added `StructuredReason` and optional `Step.StructuredReason` in `internal/domain/types.go`. Updated `internal/orchestrator/service.go` to classify worker failure/block paths, attach structured reasons to steps, emit deterministic JSON payloads in `worker_failed` and `worker_blocked` events, and preserve blocked-reason strike counting by parsing event JSON. No docs were changed. Verification passed: `go build ./...` and `go test ./...` both succeeded.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-223111.915\\step-01-types.go",
+        ".gorechera\\artifacts\\job-20260401-223111.915\\step-01-service.go"
+      ],
+      "token_usage": {
+        "input_tokens": 12327,
+        "output_tokens": 1553,
+        "total_tokens": 13880,
+        "estimated_cost_usd": 0.01388
+      },
+      "started_at": "2026-04-01T22:31:58.7561628Z",
+      "finished_at": "2026-04-01T22:35:40.2636696Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T22:31:11.9159043Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T22:31:44.3933814Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T22:31:44.3948721Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T22:31:58.7561628Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T22:35:40.2636696Z",
+      "kind": "worker_succeeded",
+      "message": "Implemented structured worker failure feedback. Added `StructuredReason` and optional `Step.StructuredReason` in `internal/domain/types.go`. Updated `internal/orchestrator/service.go` to classify worker failure/block paths, attach structured reasons to steps, emit deterministic JSON payloads in `worker_failed` and `worker_blocked` events, and preserve blocked-reason strike counting by parsing event JSON. No docs were changed. Verification passed: `go build ./...` and `go test ./...` both succeeded."
+    },
+    {
+      "time": "2026-04-01T22:35:40.264663Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T22:35:56.2393776Z",
+      "kind": "leader_summary",
+      "message": "leader emitted a summary"
+    },
+    {
+      "time": "2026-04-01T22:35:56.2408677Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T22:36:10.5824613Z",
+      "kind": "leader_summary",
+      "message": "leader emitted a summary"
+    },
+    {
+      "time": "2026-04-01T22:36:10.5834552Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T22:36:23.4901693Z",
+      "kind": "leader_summary",
+      "message": "leader emitted a summary"
+    },
+    {
+      "time": "2026-04-01T22:36:23.4911626Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T22:36:59.2810171Z",
+      "kind": "evaluation_passed",
+      "message": "The job state includes a succeeded implement step that directly covers the requested structured failure feedback changes and reports successful build/test verification."
+    },
+    {
+      "time": "2026-04-01T22:36:59.2820111Z",
+      "kind": "job_completed",
+      "message": "The required implementation step succeeded, `go build ./...` and `go test ./...` passed, and the sprint contract requires evaluator-gated completion. Choosing `complete` is the correct next action because the system must enforce evaluateCompletion() before finalizing."
+    }
+  ],
+  "created_at": "2026-04-01T22:31:11.9159043Z",
+  "updated_at": "2026-04-01T22:36:59.2820111Z"
+}

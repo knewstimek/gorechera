@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "goal": "Plan a read-only audit of the recent self-improvement changes across the targeted orchestrator, provider, and MCP paths, ending in a worker summary of findings.",
+  "summary": "Verify Perform a focused read-only audit of the specified code paths, tracing each requested behavior through its adjacent helper logic so the final worker summary can report concrete bugs, security concerns, dead code, and cross-path inconsistencies with file/line references. The work should stay tightly scoped to the named functions and their immediate dependencies, compare equivalent behaviors across orchestrator/provider/MCP layers, and produce a concise findings report rather than any code changes or remediation. with required steps: implement, review, test",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-225951.800\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-225951.800\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-225951.800\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-225951.800\\sprint_contract.json"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

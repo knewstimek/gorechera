@@ -1,0 +1,59 @@
+{
+  "goal": "Add a Multiply(a, b int) int function to main.go and add a corresponding test in main_test.go.",
+  "tech_stack": "Go",
+  "workspace_dir": "D:\\News\\Business\\sandbox-test",
+  "summary": "Inspect the existing Go files to align with current package and test structure, add a new Multiply(a, b int) int function in main.go that returns the product of its inputs, then add or extend a unit test in main_test.go to verify correct multiplication behavior. Finish by running the Go test suite to confirm the new function compiles and the test passes without introducing unrelated changes.",
+  "product_scope": [
+    "Update main.go to define Multiply(a, b int) int.",
+    "Update main_test.go to add a unit test covering Multiply.",
+    "Verify the implementation by running Go tests in the workspace."
+  ],
+  "non_goals": [
+    "Refactoring unrelated code.",
+    "Changing existing public behavior beyond adding Multiply.",
+    "Adding extra math helpers or broader test coverage not needed for Multiply.",
+    "Modifying files outside main.go and main_test.go unless required by the build."
+  ],
+  "proposed_steps": [
+    "Inspect main.go and main_test.go to confirm package name, existing functions, and current test style.",
+    "Add Multiply(a, b int) int to main.go with logic that returns a * b.",
+    "Add a unit test in main_test.go that asserts Multiply returns the expected product for a representative case.",
+    "Run go test ./... from the workspace and confirm the new test passes.",
+    "Do a final check that only the intended files were changed and acceptance criteria are met."
+  ],
+  "success_signals": [
+    "The codebase compiles with the new Multiply function present.",
+    "The Multiply unit test passes.",
+    "The full Go test command exits successfully.",
+    "Diff shows only the expected changes in main.go and main_test.go."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that Multiply(a, b int) int was added to main.go, that main_test.go contains a working test for it, and that the Go test suite passes.",
+    "scope": [
+      "D:\\News\\Business\\sandbox-test\\main.go",
+      "D:\\News\\Business\\sandbox-test\\main_test.go"
+    ],
+    "required_commands": [
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\sandbox-test\\main.go",
+      "D:\\News\\Business\\sandbox-test\\main_test.go"
+    ],
+    "required_checks": [
+      "Confirm main.go defines Multiply(a, b int) int.",
+      "Confirm Multiply returns the product using a * b.",
+      "Confirm main_test.go includes a test that calls Multiply and checks the expected result.",
+      "Confirm go test ./... succeeds from the workspace."
+    ],
+    "disallowed_actions": [
+      "Do not modify unrelated files.",
+      "Do not change existing behavior unrelated to adding Multiply and its test.",
+      "Do not skip test execution."
+    ],
+    "max_seconds": 300,
+    "notes": "Keep the change minimal and consistent with the existing package and test conventions.",
+    "owner_role": "executor"
+  }
+}

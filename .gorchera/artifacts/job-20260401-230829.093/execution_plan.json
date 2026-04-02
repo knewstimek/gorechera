@@ -1,0 +1,80 @@
+{
+  "goal": "Fix the four high-severity audit findings in orchestration and workspace validation logic without adding features.",
+  "tech_stack": "Go",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "summary": "Update the orchestration path handling and steering flow in a narrowly scoped way: sanitize untrusted worker/system text before it reaches leader context, strengthen and centralize workspace validation with absolute-path and symlink resolution checks, restrict Steer to active job states, and preserve supervisor directives in a dedicated job field that is rendered separately in the leader prompt and cleared after consumption. Keep the change set limited to the described fixes, add or update focused tests around the new behaviors, and finish with full `go build` and `go test` verification plus any directly affected documentation adjustments.",
+  "product_scope": [
+    "Sanitize untrusted worker/system summaries and block reasons before assigning `job.LeaderContextSummary`.",
+    "Add `sanitizeLeaderContext(text string) string` and apply it in `runWorkerStep` and `runSystemStep`.",
+    "Strengthen workspace validation to require absolute paths and resolve symlinks before directory checks.",
+    "Unify duplicated workspace validation into a shared helper if it can be done without introducing an import cycle.",
+    "Restrict `Steer` to jobs in `running`, `waiting_leader`, or `waiting_worker` status.",
+    "Add `SupervisorDirective` to `domain.Job`, render it separately in the leader prompt before job state, and clear it after the leader turn consumes it.",
+    "Add or update focused tests covering the four fixes.",
+    "Run `go build ./...` and `go test ./...` for verification.",
+    "Update directly affected docs only if they describe the changed steering/workspace behavior."
+  ],
+  "non_goals": [
+    "Do not add new product features or change workflow semantics beyond the four listed fixes.",
+    "Do not redesign prompt formats beyond the new isolated supervisor-directive section.",
+    "Do not broaden sanitization beyond removing lines that start with `[SUPERVISOR]` from untrusted leader-context inputs.",
+    "Do not refactor unrelated orchestrator, MCP, or provider code.",
+    "Do not change evaluator-gate, approval, harness, or worker-spawn principles.",
+    "Do not add Windows-only logic to core validation behavior."
+  ],
+  "proposed_steps": [
+    "Inspect current implementations of `runWorkerStep`, `runSystemStep`, `Steer`, leader-response handling in the run loop, both `validateWorkspaceDir` copies, `domain.Job`, and `buildLeaderPrompt` to identify exact write points and any import-cycle risk for shared validation.",
+    "Implement `sanitizeLeaderContext(text string) string` in orchestrator code and route every untrusted worker/system summary or block-reason assignment to `job.LeaderContextSummary` through that helper, leaving trusted supervisor-authored text out of this path.",
+    "Create a shared workspace validation helper, preferably in `internal/orchestrator/workspace.go`, that rejects non-absolute paths with `filepath.IsAbs`, resolves symlinks with `filepath.EvalSymlinks`, then performs the existing directory/stat checks; switch both orchestrator and MCP call sites to use it.",
+    "Update `Steer` so it returns an error unless the job is in `running`, `waiting_leader`, or `waiting_worker`, and stop writing directives into `LeaderContextSummary`.",
+    "Add `SupervisorDirective string` to `domain.Job`, have `Steer` write directives there, update `buildLeaderPrompt` to render that directive as its own section before job state when non-empty, and clear the field immediately after the next leader response is received/consumed in the run loop.",
+    "Add or update unit tests for sanitization, workspace validation, steer authorization, supervisor-directive prompt rendering, and directive clearing; then run `go build ./...` and `go test ./...`, fixing any regressions and updating only directly impacted docs if needed."
+  ],
+  "success_signals": [
+    "A diff shows the new sanitization helper, shared workspace validator, and `SupervisorDirective` field with no unrelated feature work.",
+    "Tests demonstrate terminal-state `Steer` rejection and active-state acceptance.",
+    "Tests or prompt assertions show supervisor directives are rendered separately from leader context and appear before job state.",
+    "Tests or helper coverage show relative paths are rejected and symlink-resolved paths are validated through the shared function.",
+    "`go build ./...` and `go test ./...` complete successfully in `D:\\News\\Business\\AIOrchestrator`."
+  ],
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that the four audit findings are fixed with no scope expansion and that the codebase still builds and tests cleanly.",
+    "scope": [
+      "Leader-context sanitization for untrusted worker/system input.",
+      "Shared workspace validation with absolute-path and symlink resolution checks.",
+      "Steer authorization restricted to active job states.",
+      "Supervisor directive preservation, prompt placement, and one-time clearing.",
+      "Regression coverage and repository-wide build/test verification."
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\service.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\orchestrator\\workspace.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\mcp\\server.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\domain\\types.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\protocol.go"
+    ],
+    "required_checks": [
+      "Confirm `sanitizeLeaderContext` exists and is used at the `LeaderContextSummary` assignment sites fed by worker/system outputs or block reasons.",
+      "Confirm shared workspace validation enforces `filepath.IsAbs` and calls `filepath.EvalSymlinks` before directory existence/type checks.",
+      "Confirm `Steer` rejects non-active statuses and no longer stores directives in `LeaderContextSummary`.",
+      "Confirm `domain.Job.SupervisorDirective` is rendered as a distinct leader-prompt section before job state and is cleared after the subsequent leader response is processed.",
+      "Confirm any new or updated tests cover the changed behaviors and repository-wide build/test commands pass."
+    ],
+    "disallowed_actions": [
+      "Do not add new features or broaden scope beyond the four findings.",
+      "Do not bypass evaluator-gate or alter approval/harness semantics.",
+      "Do not keep duplicated workspace validators if a cycle-free shared helper is possible.",
+      "Do not let untrusted `[SUPERVISOR]` lines reach `LeaderContextSummary`.",
+      "Do not store supervisor directives in `LeaderContextSummary` after the fix.",
+      "Do not introduce Windows-only core logic."
+    ],
+    "max_seconds": 900,
+    "notes": "Prefer a minimal patch set. If importing orchestrator from MCP would create a package cycle, move the shared validator to the smallest cycle-free internal package while preserving the same behavior and scope.",
+    "owner_role": "executor"
+  }
+}

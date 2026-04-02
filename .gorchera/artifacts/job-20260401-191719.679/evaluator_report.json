@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "passed": true,
+  "score": 96,
+  "reason": "A succeeded implement step directly covers the job goal, and subsequent review and test steps confirmed the required function, test, and passing `go test ./...` result.",
+  "evidence": [
+    "B:implement",
+    "C:review",
+    "D:test",
+    "Step 1 (`implement`) status is `succeeded` and summary states `Subtract(a, b int) int` was added to `main.go` and `TestSubtract` was added to `main_test.go`.",
+    "Step 2 (`review`) status is `succeeded` and confirms `main.go` contains `func Subtract(a, b int) int` returning `a - b` and `main_test.go` contains `TestSubtract` asserting `Subtract(10, 3) == 7`.",
+    "Step 3 (`test`) status is `succeeded` and confirms `go test ./...` exited successfully with output `ok   tempconv   (cached)`.",
+    "The steps array is present and readable, so `blocked` is not applicable."
+  ],
+  "contract_ref": ".gorechera\\artifacts\\job-20260401-191719.679\\verification_contract.json"
+}

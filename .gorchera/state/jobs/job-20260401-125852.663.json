@@ -1,0 +1,118 @@
+{
+  "id": "job-20260401-125852.663",
+  "goal": "Create an orchestrator MVP",
+  "tech_stack": "go",
+  "status": "done",
+  "provider": "mock",
+  "max_steps": 8,
+  "current_step": 3,
+  "retry_count": 0,
+  "summary": "mock provider completed implement, review, and test phases",
+  "leader_context_summary": "test completed for goal \"Create an orchestrator MVP\"",
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Create the initial orchestrator implementation skeleton.",
+      "status": "succeeded",
+      "summary": "implement completed for goal \"Create an orchestrator MVP\"",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-125852.663\\step-01-patch.diff",
+        ".gorechera\\artifacts\\job-20260401-125852.663\\step-01-implementation_notes.md"
+      ],
+      "started_at": "2026-04-01T12:58:52.6674696Z",
+      "finished_at": "2026-04-01T12:58:52.6709463Z"
+    },
+    {
+      "index": 2,
+      "target": "C",
+      "task_type": "review",
+      "task_text": "Review the implementation artifacts for regressions and protocol issues.",
+      "status": "succeeded",
+      "summary": "review completed for goal \"Create an orchestrator MVP\"",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-125852.663\\step-02-review_report.json"
+      ],
+      "started_at": "2026-04-01T12:58:52.6734298Z",
+      "finished_at": "2026-04-01T12:58:52.6764104Z"
+    },
+    {
+      "index": 3,
+      "target": "D",
+      "task_type": "test",
+      "task_text": "Run the designated validation checks and summarize the result.",
+      "status": "succeeded",
+      "summary": "test completed for goal \"Create an orchestrator MVP\"",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-125852.663\\step-03-test_report.json"
+      ],
+      "started_at": "2026-04-01T12:58:52.6793901Z",
+      "finished_at": "2026-04-01T12:58:52.6818734Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T12:58:52.6639931Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T12:58:52.665483Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T12:58:52.6674696Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T12:58:52.6709463Z",
+      "kind": "worker_succeeded",
+      "message": "implement completed for goal \"Create an orchestrator MVP\""
+    },
+    {
+      "time": "2026-04-01T12:58:52.6724362Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T12:58:52.6734298Z",
+      "kind": "worker_requested",
+      "message": "C:review"
+    },
+    {
+      "time": "2026-04-01T12:58:52.6764104Z",
+      "kind": "worker_succeeded",
+      "message": "review completed for goal \"Create an orchestrator MVP\""
+    },
+    {
+      "time": "2026-04-01T12:58:52.6778999Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T12:58:52.6793901Z",
+      "kind": "worker_requested",
+      "message": "D:test"
+    },
+    {
+      "time": "2026-04-01T12:58:52.6818734Z",
+      "kind": "worker_succeeded",
+      "message": "test completed for goal \"Create an orchestrator MVP\""
+    },
+    {
+      "time": "2026-04-01T12:58:52.6833633Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T12:58:52.6843607Z",
+      "kind": "job_completed",
+      "message": "mock provider completed implement, review, and test phases"
+    }
+  ],
+  "created_at": "2026-04-01T12:58:52.6639931Z",
+  "updated_at": "2026-04-01T12:58:52.6843607Z"
+}

@@ -1,0 +1,16 @@
+{
+  "category": "build",
+  "command": "go",
+  "args": [
+    "build",
+    "-o",
+    "tempconv.exe"
+  ],
+  "exit_code": 0,
+  "started_at": "2026-04-01T18:13:29.8473411Z",
+  "finished_at": "2026-04-01T18:13:30.2391461Z",
+  "duration": 391805000,
+  "timed_out": false,
+  "truncated_stdout": false,
+  "truncated_stderr": false
+}

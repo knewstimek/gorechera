@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "passed": true,
+  "score": 96,
+  "reason": "The job state includes a succeeded implement step that directly covers the requested Codex adapter model-selection change, test coverage, documentation update, and required build/test verification.",
+  "evidence": [
+    "B:implement",
+    "Step 1 has task_type `implement` and status `succeeded`.",
+    "Step 1 summary states `internal/provider/codex.go` now resolves role-profile models at Codex entrypoints, passes them into `runStructured`, and appends `--model \u003cname\u003e` only for non-empty GPT-style models while suppressing Claude shorthand via `isCodexModel`.",
+    "Step 1 summary states focused unit coverage was added in `internal/provider/provider_test.go` for both model-flag inclusion and suppression cases, plus direct `isCodexModel` cases.",
+    "Step 1 summary states `docs/IMPLEMENTATION_STATUS.md` was updated to reflect Codex per-role GPT model selection support.",
+    "Step 1 summary states `go build ./...` and `go test ./...` were run successfully with exit code 0."
+  ],
+  "contract_ref": ".gorechera\\artifacts\\job-20260401-234447.423\\verification_contract.json"
+}

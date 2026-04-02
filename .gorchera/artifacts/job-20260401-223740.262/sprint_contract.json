@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "goal": "Add workspace directory validation at job creation time. In internal/orchestrator/service.go Start and StartAsync functions, after creating the job struct but before running the loop, check if job.WorkspaceDir is non-empty and if the directory exists (using os.Stat). If the directory does not exist, return an error with a clear message like \"workspace directory does not exist: {path}\". Also in internal/mcp/server.go toolStartJob, validate workspace_dir before calling StartAsync and return a user-friendly MCP error if invalid. Run go build ./... and go test ./... to verify.",
+  "required_step_types": [
+    "implement"
+  ],
+  "blocking_criteria": [
+    "missing required step coverage",
+    "thresholds not satisfied"
+  ],
+  "threshold_success_count": 1,
+  "threshold_min_steps": 1,
+  "threshold_require_eval": true,
+  "strictness_level": "normal"
+}

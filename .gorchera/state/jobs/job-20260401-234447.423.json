@@ -1,0 +1,161 @@
+{
+  "id": "job-20260401-234447.423",
+  "goal": "Add model selection support to the Codex adapter. In internal/provider/codex.go, the runStructured method currently calls codex exec without a --model flag. Change it to accept the model name from the role profile and pass it as --model to codex exec. In internal/provider/provider.go or wherever RunLeader/RunWorker/RunPlanner/RunEvaluator are called, pass the role profile's Model field to the adapter. The adapter should only add --model if the model string is non-empty and not one of the Claude model names (opus/sonnet/haiku). Add a helper isCodexModel(model string) bool that returns true for GPT model names or empty string. Run go build ./... and go test ./... to verify.",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "strictness_level": "normal",
+  "context_mode": "full",
+  "role_profiles": {
+    "planner": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "codex",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that Codex provider executions honor role-profile model selection without passing Claude shorthand models to `codex exec`, and that the repo still builds and tests cleanly.",
+    "scope": [
+      "Codex adapter role-profile handling",
+      "Codex CLI `--model` gating",
+      "Provider unit tests for model flag behavior",
+      "Documentation alignment for Codex adapter capabilities"
+    ],
+    "required_commands": [
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\codex.go",
+      "D:\\News\\Business\\AIOrchestrator\\internal\\provider\\provider_test.go",
+      "D:\\News\\Business\\AIOrchestrator\\docs\\IMPLEMENTATION_STATUS.md",
+      ".gorechera\\artifacts\\job-20260401-234447.423\\verification_contract.json"
+    ],
+    "required_checks": [
+      "Confirm Codex leader/planner/evaluator/worker paths use the resolved role profile model.",
+      "Confirm `isCodexModel` accepts empty and GPT-style model names and rejects Claude shorthand names for Codex flag injection.",
+      "Confirm test coverage asserts both `--model` inclusion and suppression cases.",
+      "Confirm build and test commands pass from the workspace root."
+    ],
+    "disallowed_actions": [
+      "Do not change evaluator gate semantics.",
+      "Do not modify Claude adapter behavior unless required for compatibility.",
+      "Do not redesign provider/session interfaces beyond the minimal wiring needed for this feature.",
+      "Do not skip `go build ./...` or `go test ./...` verification."
+    ],
+    "max_seconds": 1200,
+    "notes": "Prefer the minimal implementation pattern already used by `internal/provider/claude.go`: keep role-profile resolution close to the adapter entrypoints unless a broader provider API change is strictly necessary.",
+    "owner_role": "planner"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260401-234447.423\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260401-234447.423\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-234447.423\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-234447.423\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260401-234447.423\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-234447.423\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260401-234447.423\\evaluator_report.json",
+  "chain_id": "chain-20260401-234447.421",
+  "status": "done",
+  "provider": "codex",
+  "max_steps": 8,
+  "current_step": 1,
+  "retry_count": 0,
+  "summary": "The required implementation is complete and verified. Codex adapter entrypoints now use the resolved role-profile model, `runStructured` conditionally adds `--model` only for GPT-style/empty Codex models via `isCodexModel`, Claude shorthand models are suppressed, focused provider tests were added for inclusion/suppression behavior, docs were updated, and `go build ./...` plus `go test ./...` both passed from the workspace root.",
+  "leader_context_summary": "The job state includes a succeeded implement step that directly covers the requested Codex adapter model-selection change, test coverage, documentation update, and required build/test verification.",
+  "token_usage": {
+    "input_tokens": 9451,
+    "output_tokens": 3245,
+    "total_tokens": 12696,
+    "estimated_cost_usd": 0.012695999999999999
+  },
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Implement the Codex adapter model-selection change end-to-end in D:\\News\\Business\\AIOrchestrator. Update internal/provider/codex.go so runStructured accepts the resolved role-profile model and appends `--model \u003cname\u003e` to `codex exec` only when the model is non-empty and is a Codex/GPT model, not Claude shorthand (`opus`, `sonnet`, `haiku`). Add helper `isCodexModel(model string) bool` that returns true for empty string and GPT-style model names, and false for Claude shorthand names. In the provider wiring (`internal/provider/provider.go` or the minimal correct call sites), ensure RunLeader/RunWorker/RunPlanner/RunEvaluator pass the role profile Model field through to the Codex adapter, mirroring existing Claude-style role-profile resolution without redesigning interfaces more than necessary. Add focused unit coverage in internal/provider/provider_test.go for both `--model` inclusion and suppression cases. Update docs/IMPLEMENTATION_STATUS.md to reflect Codex per-role model selection support. Then run `go build ./...` and `go test ./...` from the workspace root and report results with changed files and any notable design choices. Do not change evaluator gate semantics or Claude adapter behavior beyond minimal compatibility.",
+      "status": "succeeded",
+      "summary": "Implemented Codex per-role model selection end-to-end without changing evaluator semantics or Claude behavior. `internal/provider/codex.go` now resolves the role-profile model at each Codex entrypoint, passes it into `runStructured`, appends `--model \u003cname\u003e` only for non-empty GPT-style models, and suppresses Claude shorthand values via `isCodexModel`. No `internal/provider/provider.go` change was needed because the minimal Claude-style pattern already resolves role profiles from `job` inside the adapter entrypoints. Added focused unit coverage in `internal/provider/provider_test.go` for `--model` inclusion across leader/planner/evaluator/worker, suppression for empty/`opus`/`sonnet`/`haiku`, and direct `isCodexModel` cases. Updated `docs/IMPLEMENTATION_STATUS.md` to note Codex per-role GPT model selection support. Commands run: `gofmt -w internal/provider/codex.go internal/provider/provider_test.go`, `go test ./internal/provider`, `go build ./...`, `go test ./...`. Non-blocking warnings encountered: PowerShell reported `Microsoft.PowerShell_profile.ps1` execution-policy load warnings on shell startup, but all commands completed successfully with exit code 0.",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260401-234447.423\\step-01-codex.go",
+        ".gorechera\\artifacts\\job-20260401-234447.423\\step-01-provider_test.go",
+        ".gorechera\\artifacts\\job-20260401-234447.423\\step-01-IMPLEMENTATION_STATUS.md",
+        ".gorechera\\artifacts\\job-20260401-234447.423\\step-01-provider",
+        ".gorechera\\artifacts\\job-20260401-234447.423\\step-01-...",
+        ".gorechera\\artifacts\\job-20260401-234447.423\\step-01-..."
+      ],
+      "token_usage": {
+        "input_tokens": 7583,
+        "output_tokens": 1193,
+        "total_tokens": 8776,
+        "estimated_cost_usd": 0.008775999999999999
+      },
+      "started_at": "2026-04-01T23:46:40.5642813Z",
+      "finished_at": "2026-04-01T23:49:39.9473018Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-01T23:44:47.4250224Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-01T23:46:23.7523343Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-01T23:46:23.7538243Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:46:40.5642813Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-01T23:49:39.9473018Z",
+      "kind": "worker_succeeded",
+      "message": "Implemented Codex per-role model selection end-to-end without changing evaluator semantics or Claude behavior. `internal/provider/codex.go` now resolves the role-profile model at each Codex entrypoint, passes it into `runStructured`, appends `--model \u003cname\u003e` only for non-empty GPT-style models, and suppresses Claude shorthand values via `isCodexModel`. No `internal/provider/provider.go` change was needed because the minimal Claude-style pattern already resolves role profiles from `job` inside the adapter entrypoints. Added focused unit coverage in `internal/provider/provider_test.go` for `--model` inclusion across leader/planner/evaluator/worker, suppression for empty/`opus`/`sonnet`/`haiku`, and direct `isCodexModel` cases. Updated `docs/IMPLEMENTATION_STATUS.md` to note Codex per-role GPT model selection support. Commands run: `gofmt -w internal/provider/codex.go internal/provider/provider_test.go`, `go test ./internal/provider`, `go build ./...`, `go test ./...`. Non-blocking warnings encountered: PowerShell reported `Microsoft.PowerShell_profile.ps1` execution-policy load warnings on shell startup, but all commands completed successfully with exit code 0."
+    },
+    {
+      "time": "2026-04-01T23:49:39.9482951Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-01T23:50:19.3315899Z",
+      "kind": "evaluation_passed",
+      "message": "The job state includes a succeeded implement step that directly covers the requested Codex adapter model-selection change, test coverage, documentation update, and required build/test verification."
+    },
+    {
+      "time": "2026-04-01T23:50:19.3330796Z",
+      "kind": "job_completed",
+      "message": "The required implementation is complete and verified. Codex adapter entrypoints now use the resolved role-profile model, `runStructured` conditionally adds `--model` only for GPT-style/empty Codex models via `isCodexModel`, Claude shorthand models are suppressed, focused provider tests were added for inclusion/suppression behavior, docs were updated, and `go build ./...` plus `go test ./...` both passed from the workspace root."
+    }
+  ],
+  "created_at": "2026-04-01T23:44:47.4235324Z",
+  "updated_at": "2026-04-01T23:50:19.3330796Z"
+}

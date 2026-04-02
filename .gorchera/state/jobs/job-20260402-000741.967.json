@@ -1,0 +1,209 @@
+{
+  "id": "job-20260402-000741.967",
+  "goal": "Rename the project from gorechera to gorchera. This is a find-and-replace across the entire codebase:\n\n1. In go.mod, change module name from \"gorechera\" to \"gorchera\"\n2. In ALL .go files, replace import path \"gorechera/\" with \"gorchera/\" \n3. In ALL .go files, .md files, .json files, replace the string \"gorechera\" with \"gorchera\" and \"Gorechera\" with \"Gorchera\" (case-sensitive replacements)\n4. Rename the .gorechera directory references in code to .gorchera (the state_store.go, artifact_store.go paths)\n5. In CLAUDE.md, AGENTS.md, docs/*.md, README.md - replace all gorechera/Gorechera with gorchera/Gorchera\n6. In .mcp.json, replace gorechera with gorchera\n7. In cmd/gorechera/main.go path - note this is the filesystem path, just update string references inside the file\n\nDo NOT rename actual directories on disk (like .gorechera/ or cmd/gorechera/) - only change the content of files.\n\nRun go build ./... and go test ./... to verify after all replacements.",
+  "workspace_dir": "D:\\News\\Business\\AIOrchestrator",
+  "strictness_level": "normal",
+  "context_mode": "full",
+  "role_profiles": {
+    "planner": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "leader": {
+      "provider": "codex",
+      "model": "opus"
+    },
+    "executor": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "reviewer": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "tester": {
+      "provider": "codex",
+      "model": "sonnet"
+    },
+    "evaluator": {
+      "provider": "codex",
+      "model": "opus"
+    }
+  },
+  "verification_contract": {
+    "version": 1,
+    "goal": "Verify that the repository was renamed in-file from gorechera to gorchera across the defined text scope, without filesystem renames, and that the Go project still builds and tests successfully.",
+    "scope": [
+      "go.mod",
+      "all .go files",
+      "all .md files",
+      "all .json files",
+      "CLAUDE.md",
+      "AGENTS.md",
+      "README.md",
+      "docs/*.md",
+      ".mcp.json",
+      "code references to .gorechera paths",
+      "content inside cmd/gorechera/main.go only"
+    ],
+    "required_commands": [
+      "rg -n \"gorechera|Gorechera|gorechera/|\\.gorechera\" -g \"*.go\" -g \"*.md\" -g \"*.json\" go.mod README.md CLAUDE.md AGENTS.md docs .mcp.json cmd",
+      "go build ./...",
+      "go test ./..."
+    ],
+    "required_artifacts": [
+      "D:\\News\\Business\\AIOrchestrator\\go.mod",
+      "D:\\News\\Business\\AIOrchestrator\\README.md",
+      "D:\\News\\Business\\AIOrchestrator\\AGENTS.md",
+      "D:\\News\\Business\\AIOrchestrator\\CLAUDE.md",
+      "D:\\News\\Business\\AIOrchestrator\\.mcp.json",
+      "D:\\News\\Business\\AIOrchestrator\\cmd\\gorechera\\main.go",
+      "D:\\News\\Business\\AIOrchestrator\\docs",
+      ".gorechera\\artifacts\\job-20260402-000741.967\\verification_contract.json"
+    ],
+    "required_checks": [
+      "Confirm go.mod module line uses gorchera.",
+      "Confirm no .go file contains import path prefix gorechera/.",
+      "Confirm no in-scope .go/.md/.json content contains gorechera or Gorechera.",
+      "Confirm state/artifact store code now references .gorchera, not .gorechera.",
+      "Confirm cmd/gorechera/main.go still exists at the same filesystem path.",
+      "Confirm no directories or files were renamed on disk as part of the change.",
+      "Confirm go build ./... exits successfully.",
+      "Confirm go test ./... exits successfully."
+    ],
+    "disallowed_actions": [
+      "Do not rename cmd/gorechera or any .gorechera directory on disk.",
+      "Do not change behavior beyond the textual project rename.",
+      "Do not bypass build/test verification.",
+      "Do not ignore residual in-scope gorechera/Gorechera matches without documenting a justified exception."
+    ],
+    "max_seconds": 900,
+    "notes": "Verification should treat filesystem path names as intentionally unchanged; only file contents are in scope for renaming. Residual search results must be reviewed to distinguish content from unchanged path names shown by tooling.",
+    "owner_role": "tester"
+  },
+  "verification_contract_ref": ".gorechera\\artifacts\\job-20260402-000741.967\\verification_contract.json",
+  "planning_artifacts": [
+    ".gorechera\\artifacts\\job-20260402-000741.967\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260402-000741.967\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260402-000741.967\\sprint_contract.json",
+    ".gorechera\\artifacts\\job-20260402-000741.967\\verification_contract.json"
+  ],
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260402-000741.967\\sprint_contract.json",
+  "evaluator_report_ref": ".gorechera\\artifacts\\job-20260402-000741.967\\evaluator_report.json",
+  "status": "done",
+  "provider": "codex",
+  "max_steps": 8,
+  "current_step": 1,
+  "retry_count": 0,
+  "summary": "All sprint and verification requirements are satisfied; ready for evaluator gate and completion.",
+  "leader_context_summary": "The job state includes an implement step with status=\"succeeded\" that covers the rename goal and reports successful verification via residual search, go build, and go test.",
+  "token_usage": {
+    "input_tokens": 12009,
+    "output_tokens": 3557,
+    "total_tokens": 15566,
+    "estimated_cost_usd": 0.015566
+  },
+  "steps": [
+    {
+      "index": 1,
+      "target": "B",
+      "task_type": "implement",
+      "task_text": "Perform the repo-wide in-file rename from `gorechera` to `gorchera` in `D:\\News\\Business\\AIOrchestrator` with no filesystem renames. Update `go.mod` module path to `gorchera`. In all `.go` files replace import prefix `gorechera/` -\u003e `gorchera/`. In all `.go`, `.md`, and `.json` files replace case-sensitive `gorechera` -\u003e `gorchera` and `Gorechera` -\u003e `Gorchera`. Update code references from `.gorechera` to `.gorchera` where they are content references, especially in state/artifact store code. Update `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/*.md`, `.mcp.json`, and content inside `cmd/gorechera/main.go`. Do NOT rename any directories or files on disk, including `cmd/gorechera` and any real `.gorechera` directory. After edits, run verification commands: `rg -n \"gorechera|Gorechera|gorechera/|\\.gorechera\" -g \"*.go\" -g \"*.md\" -g \"*.json\" go.mod README.md CLAUDE.md AGENTS.md docs .mcp.json cmd`, `go build ./...`, and `go test ./...`. Review residual search hits carefully and distinguish unchanged filesystem path names in tool output from in-file content. Return a concise summary of changed files and verification results.",
+      "status": "succeeded",
+      "summary": "Completed the in-file rename from `gorechera` to `gorchera` across the requested scope. Updated `go.mod` module path, all affected Go import paths and string literals, Markdown/JSON references in the requested files, MCP/tool names, and `.gorechera` content references in code such as `cmd/gorechera/main.go`. No directories or files were renamed on disk; `cmd/gorechera/main.go` still exists. Verification passed: `rg -n \"gorechera|Gorechera|gorechera/|\\.gorechera\" -g \"*.go\" -g \"*.md\" -g \"*.json\" go.mod README.md CLAUDE.md AGENTS.md docs .mcp.json cmd` returned no matches, `go build ./...` succeeded, and `go test ./...` succeeded. Non-fatal errors encountered during execution: an initial bulk-replacement script mishandled `.mcp.json` path trimming and was corrected; an earlier login-shell invocation surfaced a PowerShell profile execution-policy warning, so verification was rerun with `-NoProfile`/non-login execution.",
+      "diff_summary": ".mcp.json                               |  4 +--\n CLAUDE.md                               |  8 ++---\n README.md                               | 34 +++++++++---------\n cmd/gorechera/main.go                   | 22 ++++++------\n docs/ARCHITECTURE.md                    | 12 +++----\n docs/CODING_CONVENTIONS.md              |  4 +--\n docs/IMPLEMENTATION_STATUS.md           |  8 ++---\n docs/MESSAGE_SCHEMA_EXAMPLE.md          |  4 +--\n docs/ORCHESTRATOR_SPEC_UPDATED.md       | 12 +++----\n docs/PRINCIPLES.md                      |  4 +--\n go.mod                                  |  2 +-\n internal/api/harness.go                 |  6 ++--\n internal/api/requests.go                |  4 +--\n internal/api/server.go                  |  4 +--\n internal/api/server_test.go             | 12 +++----\n internal/api/views.go                   |  2 +-\n internal/mcp/server.go                  | 64 ++++++++++++++++-----------------\n internal/mcp/server_test.go             | 16 ++++-----\n internal/orchestrator/evaluator.go      |  2 +-\n internal/orchestrator/evaluator_test.go |  2 +-\n internal/orchestrator/parallel.go       |  4 +--\n internal/orchestrator/planning.go       |  4 +--\n internal/orchestrator/service.go        | 14 ++++----\n internal/orchestrator/service_test.go   | 12 +++----\n internal/orchestrator/verification.go   |  2 +-\n internal/policy/policy_test.go          |  2 +-\n internal/provider/claude.go             |  2 +-\n internal/provider/codex.go              |  4 +--\n internal/provider/errors.go             |  2 +-\n internal/provider/mock/mock.go          |  2 +-\n internal/provider/protocol.go           |  4 +--\n internal/provider/provider.go           |  2 +-\n internal/provider/provider_test.go      | 10 +++---\n internal/schema/validate.go             |  2 +-\n internal/schema/validate_test.go        |  2 +-\n internal/store/artifact_store.go        |  4 +--\n internal/store/state_store.go           |  2 +-\n internal/store/state_store_test.go      |  2 +-\n 38 files changed, 151 insertions(+), 151 deletions(-)",
+      "artifacts": [
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-go.mod",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-.mcp.json",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-README.md",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-CLAUDE.md",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-main.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-ARCHITECTURE.md",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-CODING_CONVENTIONS.md",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-IMPLEMENTATION_STATUS.md",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-MESSAGE_SCHEMA_EXAMPLE.md",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-ORCHESTRATOR_SPEC_UPDATED.md",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-PRINCIPLES.md",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-harness.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-requests.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-server.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-server_test.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-views.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-server.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-server_test.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-evaluator.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-evaluator_test.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-parallel.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-planning.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-service.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-service_test.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-verification.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-policy_test.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-claude.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-codex.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-errors.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-mock.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-protocol.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-provider.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-provider_test.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-validate.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-validate_test.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-artifact_store.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-state_store.go",
+        ".gorechera\\artifacts\\job-20260402-000741.967\\step-01-state_store_test.go"
+      ],
+      "token_usage": {
+        "input_tokens": 9811,
+        "output_tokens": 1598,
+        "total_tokens": 11409,
+        "estimated_cost_usd": 0.011408999999999999
+      },
+      "started_at": "2026-04-02T00:08:33.8355215Z",
+      "finished_at": "2026-04-02T00:13:22.9026543Z"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-04-02T00:07:41.9680693Z",
+      "kind": "job_created",
+      "message": "job created"
+    },
+    {
+      "time": "2026-04-02T00:08:20.2492074Z",
+      "kind": "job_planned",
+      "message": "planned 4 artifacts"
+    },
+    {
+      "time": "2026-04-02T00:08:20.2502007Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-02T00:08:33.8355215Z",
+      "kind": "worker_requested",
+      "message": "B:implement"
+    },
+    {
+      "time": "2026-04-02T00:13:22.9872383Z",
+      "kind": "worker_succeeded",
+      "message": "Completed the in-file rename from `gorechera` to `gorchera` across the requested scope. Updated `go.mod` module path, all affected Go import paths and string literals, Markdown/JSON references in the requested files, MCP/tool names, and `.gorechera` content references in code such as `cmd/gorechera/main.go`. No directories or files were renamed on disk; `cmd/gorechera/main.go` still exists. Verification passed: `rg -n \"gorechera|Gorechera|gorechera/|\\.gorechera\" -g \"*.go\" -g \"*.md\" -g \"*.json\" go.mod README.md CLAUDE.md AGENTS.md docs .mcp.json cmd` returned no matches, `go build ./...` succeeded, and `go test ./...` succeeded. Non-fatal errors encountered during execution: an initial bulk-replacement script mishandled `.mcp.json` path trimming and was corrected; an earlier login-shell invocation surfaced a PowerShell profile execution-policy warning, so verification was rerun with `-NoProfile`/non-login execution."
+    },
+    {
+      "time": "2026-04-02T00:13:22.9885776Z",
+      "kind": "leader_requested",
+      "message": "requesting leader action"
+    },
+    {
+      "time": "2026-04-02T00:13:53.8313621Z",
+      "kind": "evaluation_passed",
+      "message": "The job state includes an implement step with status=\"succeeded\" that covers the rename goal and reports successful verification via residual search, go build, and go test."
+    },
+    {
+      "time": "2026-04-02T00:13:53.8323555Z",
+      "kind": "job_completed",
+      "message": "All sprint and verification requirements are satisfied; ready for evaluator gate and completion."
+    }
+  ],
+  "created_at": "2026-04-02T00:07:41.9675725Z",
+  "updated_at": "2026-04-02T00:13:53.8323555Z"
+}

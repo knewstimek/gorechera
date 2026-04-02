@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Fix the 5 audited medium-severity defects in orchestrator state handling, worker-failure classification, context payload generation, UTF-8-safe summary truncation, and parallel worker failure flow, then verify with Go build and tests.",
+  "summary": "Verify Update the existing orchestrator and provider code paths only where the audit identified behavioral defects: make summarize honor completion retry cleanup and persistence semantics, broaden schema-violation detection for worker failures, correct minimal-context step counters and UTF-8-safe summary truncation, and align parallel worker failure handling with the single-worker path so failed workers return control to the leader instead of failing the whole job. Add or extend focused regression tests for each fix, update the implementation-status documentation to reflect the resolved findings and any behavior notes, then run the required Go build and test commands. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-230837.565\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-230837.565\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-230837.565\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-230837.565\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

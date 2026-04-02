@@ -1,0 +1,17 @@
+{
+  "category": "build",
+  "command": "go",
+  "args": [
+    "test",
+    "-v",
+    "./..."
+  ],
+  "exit_code": 0,
+  "stdout": "=== RUN   TestCtoF\n--- PASS: TestCtoF (0.00s)\n=== RUN   TestFtoC\n--- PASS: TestFtoC (0.00s)\nPASS\nok  \ttempconv\t0.393s\n",
+  "started_at": "2026-04-01T17:56:23.0668156Z",
+  "finished_at": "2026-04-01T17:56:23.9566804Z",
+  "duration": 889864800,
+  "timed_out": false,
+  "truncated_stdout": false,
+  "truncated_stderr": false
+}

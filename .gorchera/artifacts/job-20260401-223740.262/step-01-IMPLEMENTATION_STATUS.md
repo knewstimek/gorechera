@@ -1,0 +1,5 @@
+{
+  "next_recommended_action": "None.",
+  "status": "success",
+  "summary": "Implemented fail-fast workspace directory validation in orchestrator job creation and MCP start-job handling. `internal/orchestrator/service.go` now validates non-empty `WorkspaceDir` immediately after job construction in both `Start` and `StartAsync`, before persistence or loop/goroutine execution, returning `workspace directory does not exist: {path}` for invalid paths. `internal/mcp/server.go` now validates `workspace_dir` before calling `StartAsync` so MCP callers receive a user-visible error. Added regression tests covering invalid and valid workspace paths, including checks that invalid paths are rejected before persistence/background execution and that the invalid-path text is included. Updated implementation status docs. Verification: `go build ./...` passed; `go test ./...` passed."
+}

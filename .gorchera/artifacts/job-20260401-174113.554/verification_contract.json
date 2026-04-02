@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "goal": "Create a Go CLI tool (tempconv) that converts temperatures between Celsius and Fahrenheit with unit flags and unit tests.",
+  "summary": "Verify Initialize a Go module (tempconv) in the workspace directory and implement a CLI that accepts a numeric value plus a unit flag (-c or -f) indicating the input unit, then prints the converted temperature. The conversion logic will be separated into a testable package function. Unit tests will cover normal values, edge cases (0, negative, absolute zero), and invalid input handling. The project will consist of main.go for CLI parsing and conversion output, plus main_test.go for tests. with required steps: implement, review, test",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-174113.554\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-174113.554\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-174113.554\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-174113.554\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement",
+    "review",
+    "test"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}

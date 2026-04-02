@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "goal": "Add per-step artifact diff tracking so successful worker steps capture a git diff summary in orchestrator state.",
+  "summary": "Verify Extend the step domain model with a `DiffSummary` field, then update the orchestrator success path to attempt `git diff --stat` in the workspace after each worker step completes successfully. The implementation should treat missing git or non-repository workspaces as non-fatal and store an empty string in those cases. Update the relevant documentation to reflect the new step metadata and verify the change with the required Go build and test commands. with required steps: implement",
+  "sprint_contract_ref": ".gorechera\\artifacts\\job-20260401-235019.337\\sprint_contract.json",
+  "planning_artifact_refs": [
+    ".gorechera\\artifacts\\job-20260401-235019.337\\product_spec.md",
+    ".gorechera\\artifacts\\job-20260401-235019.337\\execution_plan.json",
+    ".gorechera\\artifacts\\job-20260401-235019.337\\sprint_contract.json"
+  ],
+  "required_step_types": [
+    "implement"
+  ],
+  "tester_instructions": [
+    "Read the verification contract before running tests.",
+    "Use the contract to choose only the tests needed for the current step.",
+    "Return the exact commands, outcomes, and artifacts produced."
+  ],
+  "evaluator_criteria": [
+    "tester output references the verification contract",
+    "tester output includes concrete artifacts or logs",
+    "required step coverage matches the sprint contract"
+  ]
+}
