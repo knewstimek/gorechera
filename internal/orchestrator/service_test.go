@@ -2093,3 +2093,188 @@ func TestServiceShutdownCancelsContext(t *testing.T) {
 	svc.Shutdown()
 	svc.Shutdown()
 }
+
+func TestServiceResumeSuppressesDuplicateRunLoop(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	registry := provider.NewRegistry()
+	control := newGatedLeaderProvider(domain.ProviderName("resume-dedup"))
+	registry.Register(control)
+	stateStore := store.NewStateStore(filepath.Join(root, "state"))
+
+	service := orchestrator.NewService(
+		provider.NewSessionManager(registry),
+		stateStore,
+		store.NewArtifactStore(filepath.Join(root, "artifacts")),
+		root,
+	)
+
+	job := saveRecoverableLeaderJob(t, stateStore, root, control.name, "job-resume-dedup")
+
+	resultCh := make(chan struct {
+		job *domain.Job
+		err error
+	}, 1)
+	go func() {
+		resumed, err := service.Resume(context.Background(), job.ID)
+		resultCh <- struct {
+			job *domain.Job
+			err error
+		}{job: resumed, err: err}
+	}()
+
+	waitForLeaderStart(t, control.started, "initial resume to enter leader phase")
+
+	updated, err := service.Resume(context.Background(), job.ID)
+	if err != nil {
+		t.Fatalf("second Resume returned error: %v", err)
+	}
+	if updated.ID != job.ID {
+		t.Fatalf("expected same job ID on duplicate resume, got %q", updated.ID)
+	}
+	if got := control.LeaderCalls(); got != 1 {
+		t.Fatalf("expected duplicate resume to be suppressed, got %d leader calls", got)
+	}
+
+	close(control.release)
+
+	result := <-resultCh
+	if result.err != nil {
+		t.Fatalf("initial Resume returned error: %v", result.err)
+	}
+	if result.job.Status != domain.JobStatusBlocked {
+		t.Fatalf("expected blocked status after releasing gated leader, got %s", result.job.Status)
+	}
+}
+
+func TestServiceRecoverJobsCapsConcurrentRecovery(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	registry := provider.NewRegistry()
+	control := newGatedLeaderProvider(domain.ProviderName("recover-cap"))
+	registry.Register(control)
+	stateStore := store.NewStateStore(filepath.Join(root, "state"))
+
+	service := orchestrator.NewService(
+		provider.NewSessionManager(registry),
+		stateStore,
+		store.NewArtifactStore(filepath.Join(root, "artifacts")),
+		root,
+	)
+
+	saveRecoverableLeaderJob(t, stateStore, root, control.name, "job-recover-1")
+	saveRecoverableLeaderJob(t, stateStore, root, control.name, "job-recover-2")
+	saveRecoverableLeaderJob(t, stateStore, root, control.name, "job-recover-3")
+
+	service.RecoverJobs()
+
+	waitForLeaderStart(t, control.started, "first recovered job to start")
+	waitForLeaderStart(t, control.started, "second recovered job to start")
+
+	select {
+	case <-control.started:
+		t.Fatal("expected recovery concurrency cap to prevent a third simultaneous leader call")
+	case <-time.After(250 * time.Millisecond):
+	}
+
+	close(control.release)
+	waitForLeaderCalls(t, control, 3, 2*time.Second)
+}
+
+type gatedLeaderProvider struct {
+	name        domain.ProviderName
+	started     chan struct{}
+	release     chan struct{}
+	mu          sync.Mutex
+	leaderCalls int
+}
+
+func newGatedLeaderProvider(name domain.ProviderName) *gatedLeaderProvider {
+	return &gatedLeaderProvider{
+		name:    name,
+		started: make(chan struct{}, 8),
+		release: make(chan struct{}),
+	}
+}
+
+func (p *gatedLeaderProvider) Name() domain.ProviderName {
+	return p.name
+}
+
+func (p *gatedLeaderProvider) RunLeader(ctx context.Context, _ domain.Job) (string, error) {
+	p.mu.Lock()
+	p.leaderCalls++
+	p.mu.Unlock()
+
+	select {
+	case p.started <- struct{}{}:
+	default:
+	}
+
+	select {
+	case <-p.release:
+		return `{"action":"blocked","target":"none","task_type":"none","reason":"gated leader released"}`, nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
+func (p *gatedLeaderProvider) RunWorker(_ context.Context, _ domain.Job, _ domain.LeaderOutput) (string, error) {
+	return `{"status":"success","summary":"unused","artifacts":[],"blocked_reason":"","error_reason":"","next_recommended_action":""}`, nil
+}
+
+func (p *gatedLeaderProvider) LeaderCalls() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.leaderCalls
+}
+
+func saveRecoverableLeaderJob(t *testing.T, stateStore *store.StateStore, root string, providerName domain.ProviderName, jobID string) *domain.Job {
+	t.Helper()
+
+	sprintContract := filepath.Join(root, jobID+"-sprint.json")
+	if err := os.WriteFile(sprintContract, []byte(`{"version":1,"goal":"recoverable leader job","threshold_success_count":0,"threshold_min_steps":0,"threshold_require_eval":false}`), 0o644); err != nil {
+		t.Fatalf("failed to write sprint contract: %v", err)
+	}
+
+	job := &domain.Job{
+		ID:                jobID,
+		Goal:              "Recover leader-only job",
+		WorkspaceDir:      root,
+		Status:            domain.JobStatusWaitingLeader,
+		Provider:          providerName,
+		RoleProfiles:      domain.DefaultRoleProfiles(providerName),
+		PlanningArtifacts: []string{"plan.json"},
+		SprintContractRef: sprintContract,
+		MaxSteps:          1,
+		CreatedAt:         time.Now().UTC(),
+		UpdatedAt:         time.Now().UTC(),
+	}
+	if err := stateStore.SaveJob(context.Background(), job); err != nil {
+		t.Fatalf("failed to save recoverable job %s: %v", jobID, err)
+	}
+	return job
+}
+
+func waitForLeaderStart(t *testing.T, started <-chan struct{}, message string) {
+	t.Helper()
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for %s", message)
+	}
+}
+
+func waitForLeaderCalls(t *testing.T, provider *gatedLeaderProvider, want int, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if provider.LeaderCalls() >= want {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %d leader calls, got %d", want, provider.LeaderCalls())
+}

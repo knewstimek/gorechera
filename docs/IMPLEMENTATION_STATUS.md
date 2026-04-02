@@ -24,6 +24,10 @@ go test ./...    # PASS
 - Planner prompt includes role profiles (provider/model per role) to inform `recommended_strictness` and `recommended_max_steps`; chain context section injected when `job.ChainContext` is present.
 - Leader summarize throttling: after two consecutive summarize turns, the service forces completion evaluation instead of allowing endless summary churn.
 - Repeated blocked-reason protection: the same blocked reason three times in a row escalates to job failure.
+- Startup recovery hardening:
+  - `runLoop()` is single-flight per job ID within a process, so duplicate `Resume()` / recovery attempts are suppressed.
+  - `RecoverJobs()` now schedules recoverable jobs with bounded concurrency (`2`) instead of unbounded fan-out.
+  - Recovery is only triggered for long-lived controller commands (`serve`, `mcp`), not for one-shot CLI commands.
 - Rough token/cost accounting using serialized input/output heuristics.
 
 ### Provider integration
@@ -199,4 +203,5 @@ All 10 HIGH severity findings from `docs/AUDIT_REPORT.md` have been fixed. `go b
 
 - The workspace is already dirty outside this docs task. Pre-existing Go file modifications are present in the repository, so verification must distinguish this task's docs-only edits from unrelated local changes.
 - Provider fallback is provider-aware but not model-aware. `fallback_model` is currently configuration-only.
+- Token/cost accounting is still heuristic-only and currently underestimates real provider pricing. The incident review item to replace the flat `roughCostPerTokenUSD` with model-aware pricing is not implemented yet.
 - The prompt contract still tells workers to use shell commands for file creation, but repository editing policy for this project is enforced outside the runtime prompt by the orchestrator workflow and code review, not by a separate worker sandbox contract inside Go code.

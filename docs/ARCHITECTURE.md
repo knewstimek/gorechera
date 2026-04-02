@@ -52,6 +52,13 @@ Notes:
 - `JobStatusQueued` exists in `types.go` but `Start` and `StartAsync` currently create jobs in `starting`.
 - `complete` never transitions directly to `done`; `evaluateCompletion()` must pass first.
 - `blockedReasonStrikeCount()` fails the job after the same blocked reason is recorded three times in a row.
+- `runLoop()` is single-flight per job ID within a process. Duplicate `Resume()` / recovery attempts for the same job return the latest persisted snapshot instead of starting another provider turn.
+
+## Recovery Semantics
+
+- `RecoverJobs()` only runs for long-lived controller entry points (`gorchera serve`, `gorchera mcp`), not for one-shot CLI commands such as `run`, `status`, or `resume`.
+- Recoverable jobs are the persisted non-terminal states: `starting`, `running`, `waiting_leader`, `waiting_worker`.
+- Recovery schedules jobs oldest-first with a bounded concurrency of 2 so a restart cannot stampede the provider with every stale job at once.
 
 ## Core Loop
 

@@ -29,6 +29,7 @@ const (
 	providerRetryLimit     = 3
 	providerRetryBaseDelay = 250 * time.Millisecond
 	roughCostPerTokenUSD   = 0.000001
+	recoveryConcurrency    = 2
 )
 
 // EventNotification carries a job state change that the MCP server can relay
@@ -83,6 +84,9 @@ type Service struct {
 	// goroutines (started by startPreparedJobAsync) to stop.
 	shutdownCtx    context.Context
 	shutdownCancel context.CancelFunc
+
+	runMu       sync.Mutex
+	runningJobs map[string]struct{}
 }
 
 func NewService(sessions *provider.SessionManager, state *store.StateStore, artifacts *store.ArtifactStore, workspaceRoot string) *Service {
@@ -104,6 +108,7 @@ func NewService(sessions *provider.SessionManager, state *store.StateStore, arti
 		harnessInflight: make(map[int]string),
 		shutdownCtx:     shutdownCtx,
 		shutdownCancel:  shutdownCancel,
+		runningJobs:     make(map[string]struct{}),
 	}
 }
 
@@ -124,22 +129,72 @@ func (s *Service) RecoverJobs() {
 		log.Printf("[gorchera] recovery: failed to list jobs: %v", err)
 		return
 	}
-	recovered := 0
+	recoverable := make([]domain.Job, 0, len(jobs))
 	for i := range jobs {
-		job := &jobs[i]
+		job := jobs[i]
 		switch job.Status {
 		case domain.JobStatusStarting, domain.JobStatusRunning,
 			domain.JobStatusWaitingLeader, domain.JobStatusWaitingWorker:
-			log.Printf("[gorchera] recovery: resuming job %s (status=%s)", job.ID, job.Status)
-			go func(j *domain.Job) {
-				s.runLoop(s.shutdownCtx, j) //nolint:errcheck
-			}(job)
-			recovered++
+			recoverable = append(recoverable, job)
 		}
 	}
-	if recovered > 0 {
-		log.Printf("[gorchera] recovery: resumed %d jobs", recovered)
+	if len(recoverable) == 0 {
+		return
 	}
+
+	sort.Slice(recoverable, func(i, j int) bool {
+		return recoverable[i].UpdatedAt.Before(recoverable[j].UpdatedAt)
+	})
+
+	go func(jobs []domain.Job) {
+		sem := make(chan struct{}, recoveryConcurrency)
+		for i := range jobs {
+			job := jobs[i]
+			log.Printf("[gorchera] recovery: scheduling job %s (status=%s)", job.ID, job.Status)
+			sem <- struct{}{}
+			go func(j domain.Job) {
+				defer func() { <-sem }()
+				if _, err := s.runLoop(s.shutdownCtx, &j); err != nil {
+					log.Printf("[gorchera] recovery: job %s failed: %v", j.ID, err)
+				}
+			}(job)
+		}
+	}(recoverable)
+
+	log.Printf("[gorchera] recovery: scheduled %d jobs with max concurrency %d", len(recoverable), recoveryConcurrency)
+}
+
+func (s *Service) claimJobRun(jobID string) bool {
+	if strings.TrimSpace(jobID) == "" {
+		return true
+	}
+	s.runMu.Lock()
+	defer s.runMu.Unlock()
+	if _, exists := s.runningJobs[jobID]; exists {
+		return false
+	}
+	s.runningJobs[jobID] = struct{}{}
+	return true
+}
+
+func (s *Service) releaseJobRun(jobID string) {
+	if strings.TrimSpace(jobID) == "" {
+		return
+	}
+	s.runMu.Lock()
+	delete(s.runningJobs, jobID)
+	s.runMu.Unlock()
+}
+
+func (s *Service) latestJobSnapshot(job *domain.Job) *domain.Job {
+	if job == nil || strings.TrimSpace(job.ID) == "" {
+		return job
+	}
+	latest, err := s.state.LoadJob(context.Background(), job.ID)
+	if err != nil {
+		return job
+	}
+	return latest
 }
 
 // EventChan returns a read-only channel that receives a notification each time
@@ -268,7 +323,9 @@ func (s *Service) startPreparedJobAsync(ctx context.Context, job *domain.Job) er
 		return err
 	}
 	go func() {
-		s.runLoop(s.shutdownCtx, job) //nolint:errcheck
+		if _, err := s.runLoop(s.shutdownCtx, job); err != nil {
+			log.Printf("[gorchera] async job %s failed: %v", job.ID, err)
+		}
 	}()
 	return nil
 }
@@ -851,6 +908,12 @@ func (s *Service) interruptChainGoalJob(ctx context.Context, chain *domain.JobCh
 }
 
 func (s *Service) runLoop(ctx context.Context, job *domain.Job) (*domain.Job, error) {
+	if !s.claimJobRun(job.ID) {
+		log.Printf("[gorchera] suppressing duplicate runLoop for job %s", job.ID)
+		return s.latestJobSnapshot(job), nil
+	}
+	defer s.releaseJobRun(job.ID)
+
 	if len(job.PlanningArtifacts) == 0 || strings.TrimSpace(job.SprintContractRef) == "" {
 		if err := s.ensurePlanning(ctx, job); err != nil {
 			return nil, err

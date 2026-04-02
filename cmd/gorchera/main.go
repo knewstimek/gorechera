@@ -43,7 +43,9 @@ func main() {
 
 	sessionManager := provider.NewSessionManager(registry)
 	service := orchestrator.NewService(sessionManager, stateStore, artifactStore, workspaceRoot)
-	service.RecoverJobs()
+	if shouldRecoverJobs(os.Args[1]) {
+		service.RecoverJobs()
+	}
 
 	ctx := context.Background()
 
@@ -96,6 +98,15 @@ func main() {
 	default:
 		usage()
 		os.Exit(2)
+	}
+}
+
+func shouldRecoverJobs(command string) bool {
+	switch strings.TrimSpace(command) {
+	case "serve", "mcp":
+		return true
+	default:
+		return false
 	}
 }
 
