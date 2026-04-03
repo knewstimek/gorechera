@@ -1,6 +1,13 @@
 {
   "_comment": "Provider presets for gorchera_start_job role_overrides.",
   "_note": "director and evaluator use strong models for planning/judgment. executor and reviewer use cost-efficient models for implementation/review.",
+  "_pre_build_examples": {
+    "go": ["go mod tidy"],
+    "node": ["npm install"],
+    "python": ["pip install -r requirements.txt"],
+    "rust": ["cargo fetch"],
+    "multi": ["go mod tidy", "go generate ./..."]
+  },
 
   "cross-provider (recommended)": {
     "_description": "GPT plans, Claude executes. Best quality/cost ratio.",
@@ -34,6 +41,7 @@
     "_description": "All gpt-5.3-codex-spark. Near-instant coding, lowest latency. Pro subscription required.",
     "provider": "codex",
     "pipeline_mode": "light",
+    "pre_build_commands": ["go mod tidy"],
     "role_overrides": {
       "director": {"model": "gpt-5.3-codex-spark"},
       "executor": {"model": "gpt-5.3-codex-spark"},
