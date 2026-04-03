@@ -89,6 +89,8 @@ For the full guide on goal writing, ambition levels, invariants, provider preset
 5. [SUPERVISOR_GUIDE.md](./docs/SUPERVISOR_GUIDE.md) -- goal writing, ambition levels, invariants, operational tips
 6. [ORCHESTRATOR_SPEC_UPDATED.md](./docs/ORCHESTRATOR_SPEC_UPDATED.md) -- detailed design spec
 7. [BLOG_COMPARISON.md](./docs/BLOG_COMPARISON.md) -- comparison with Anthropic's harness engineering blog
+8. [API_REFERENCE.md](./docs/API_REFERENCE.md) -- MCP tools, HTTP API, CLI commands
+9. [INSTALL.md](./docs/INSTALL.md) -- prerequisites, build, configuration, running modes
 
 ## License
 
