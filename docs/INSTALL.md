@@ -268,7 +268,6 @@ Create a profiles JSON file to assign different models per role:
 {
   "director":  {"provider": "codex",  "model": "gpt-4o"},
   "executor":  {"provider": "claude", "model": "sonnet"},
-  "reviewer":  {"provider": "claude", "model": "sonnet"},
   "evaluator": {"provider": "claude", "model": "sonnet"}
 }
 ```

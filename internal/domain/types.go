@@ -160,7 +160,9 @@ func (p ExecutionProfile) withFallback(base ProviderName) ExecutionProfile {
 func RoleForTaskType(taskType string) RoleName {
 	switch strings.ToLower(strings.TrimSpace(taskType)) {
 	case "review", "audit":
-		return RoleReviewer
+		// Route to executor so review/audit tasks use executor profile.
+		// RoleReviewer is kept for backwards-compatible profile lookup only.
+		return RoleExecutor
 	case "test":
 		return RoleExecutor
 	case "implement", "build", "lint", "search", "command":

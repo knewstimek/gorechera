@@ -56,7 +56,7 @@ This is a workflow-engine version of the same idea rather than a UI-app-builder-
 
 ### 5. Role-specialized agents instead of a single undifferentiated worker
 
-The blog's planner/generator/evaluator split maps conceptually to Gorchera's planner/leader/executor/reviewer/tester/evaluator roles. Gorchera also supports role-specific provider/model routing. Evidence:
+The blog's planner/generator/evaluator split maps conceptually to Gorchera's planner/leader/executor/tester/evaluator roles. Gorchera also supports role-specific provider/model routing. Evidence:
 
 - `docs/ARCHITECTURE.md`: role profiles and overrides, role-based provider selection
 - `docs/IMPLEMENTATION_STATUS.md`: role-based provider resolution

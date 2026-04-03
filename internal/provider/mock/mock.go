@@ -59,13 +59,13 @@ func (a *Adapter) RunLeader(_ context.Context, job domain.Job) (string, error) {
 				},
 				{
 					Target:   "C",
-					TaskType: "review",
-					TaskText: "Review the parallel execution scaffolding for policy and schema regressions.",
+					TaskType: "search",
+					TaskText: "Search for policy and schema regression risks in the execution scaffolding.",
 					Artifacts: []string{
 						"parallel_execution_plan.md",
-						"review_notes.md",
+						"search_notes.md",
 					},
-					NextHint: "Return review findings and any blocking issues.",
+					NextHint: "Return search findings and any blocking issues.",
 				},
 			},
 			Reason: "parallel fan-out is appropriate for the initial goal",
@@ -81,17 +81,17 @@ func (a *Adapter) RunLeader(_ context.Context, job domain.Job) (string, error) {
 			},
 			NextHint: "Return implementation artifacts and a concise summary.",
 		}
-	case !hasSucceeded(job, "review"):
+	case !hasSucceeded(job, "search"):
 		out = domain.LeaderOutput{
 			Action:   "run_worker",
 			Target:   "C",
-			TaskType: "review",
-			TaskText: "Review the implementation artifacts for regressions and protocol issues.",
+			TaskType: "search",
+			TaskText: "Search codebase for integration points and summarize findings.",
 			Artifacts: []string{
 				"patch.diff",
 				"implementation_notes.md",
 			},
-			NextHint: "Return review findings and approval status.",
+			NextHint: "Return search findings.",
 		}
 	case !hasSucceeded(job, "test"):
 		out = domain.LeaderOutput{
@@ -109,7 +109,7 @@ func (a *Adapter) RunLeader(_ context.Context, job domain.Job) (string, error) {
 			Action:   "complete",
 			Target:   "none",
 			TaskType: "none",
-			Reason:   "mock provider completed implement, review, and test phases",
+			Reason:   "mock provider completed implement, search, and test phases",
 		}
 	}
 
@@ -214,8 +214,8 @@ func (a *Adapter) RunWorker(_ context.Context, job domain.Job, task domain.Leade
 	switch task.TaskType {
 	case "implement":
 		out.Artifacts = []string{"patch.diff", "implementation_notes.md"}
-	case "review":
-		out.Artifacts = []string{"review_report.json"}
+	case "search":
+		out.Artifacts = []string{"search_report.json"}
 	case "test":
 		out.Artifacts = []string{"test_report.json", "verification_evidence.json"}
 		if job.VerificationContract != nil {
@@ -244,8 +244,8 @@ func hasSucceeded(job domain.Job, taskType string) bool {
 func nextAction(taskType string) string {
 	switch taskType {
 	case "implement":
-		return "review"
-	case "review":
+		return "search"
+	case "search":
 		return "test"
 	default:
 		return "complete"
@@ -253,7 +253,7 @@ func nextAction(taskType string) string {
 }
 
 func missingRequired(job domain.Job) []string {
-	required := []string{"implement", "review", "test"}
+	required := []string{"implement", "search", "test"}
 	if hasSystem(job) {
 		required = append(required, "search")
 	}

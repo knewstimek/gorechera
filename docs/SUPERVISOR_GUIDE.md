@@ -93,7 +93,7 @@ Choose based on task complexity:
 | Mode | Pipeline | When to use |
 |------|----------|------------|
 | **light** (default) | director -> executor -> engine -> evaluator | Simple changes, low risk |
-| **balanced** | + reviewer before evaluator | Moderate changes, code review needed |
+| **balanced** | evaluator THOROUGH verification | Moderate changes, code review needed |
 | **full** | + fix loops, parallel workers | Complex/risky, multiple iterations expected |
 
 ## Provider Presets
@@ -105,19 +105,18 @@ See `examples/role-profiles.sample.json` for full presets. Recommended:
   "provider": "codex",
   "pipeline_mode": "light",
   "role_overrides": {
-    "executor": {"provider": "claude", "model": "sonnet"},
-    "reviewer": {"provider": "claude", "model": "sonnet"}
+    "executor": {"provider": "claude", "model": "sonnet"}
   }
 }
 ```
 
-Result: director/evaluator = GPT 5.4, executor/reviewer = Claude Sonnet. ~$0.04/job in light mode.
+Result: director/evaluator = GPT 5.4, executor = Claude Sonnet. ~$0.04/job in light mode.
 
 ## Job Submission Checklist
 
 Before every `gorchera_start_job`:
 
-1. role_overrides set? (default: executor/reviewer = claude sonnet)
+1. role_overrides set? (default: executor = claude sonnet)
 2. workspace_mode = isolated? (shared causes scope violation accidents)
 3. ambition_level appropriate?
 4. context_mode set? (summary for large jobs)
@@ -146,7 +145,7 @@ Role prompts can be customized without modifying source code.
 
 Place markdown files under `.gorchera/prompts/` named after the role:
 
-- `director.md`, `executor.md`, `evaluator.md`, `reviewer.md`
+- `director.md`, `executor.md`, `evaluator.md`
 
 Default behavior: the file content is prepended before the built-in base prompt.
 If the first line is exactly `# REPLACE`, the base prompt is discarded entirely.

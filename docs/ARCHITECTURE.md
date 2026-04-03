@@ -49,12 +49,12 @@ Notes:
 ## Pipeline Topology
 
 Target execution pipeline:
-- `director -> executor -> [engine: go build ./... + go test ./...] -> reviewer -> evaluator`
+- `director -> executor -> [engine: go build ./... + go test ./...] -> evaluator`
 
 Pipeline modes:
-- `light`: skips reviewer but still requires the evaluator gate.
-- `balanced`: default mode; keeps reviewer and evaluator.
-- `full`: keeps reviewer/evaluator and enables heavier director orchestration patterns such as fix loops and parallel workers.
+- `light`: evaluator performs QUICK verification (artifact read + acceptance criteria check).
+- `balanced`: evaluator performs THOROUGH verification including code review and contract validation.
+- `full`: evaluator performs EXHAUSTIVE verification and enables heavier director orchestration patterns such as fix loops and parallel workers.
 
 Control-plane compatibility notes:
 - `gorchera_start_job` accepts `pipeline_mode`; omitted values are treated as `balanced`.
@@ -222,14 +222,14 @@ Leader prompt behavior:
 - The directive is inserted before current job state with explicit highest-priority instructions
 - After a successful leader provider call, `runLoop()` clears `job.SupervisorDirective`
 - The directive does not bypass evaluator gates, approval checks, harness ownership rules, or chain controls
-- The leader prompt now includes a conditional high-risk review trigger: lifecycle/restart/retry/recovery/concurrency/deduplication/external-pricing/auth/UI-event-boundary changes should dispatch an explicit review or audit step before `complete`
+- The leader prompt now includes a conditional high-risk review trigger: lifecycle/restart/retry/recovery/concurrency/deduplication/external-pricing/auth/UI-event-boundary changes are flagged so the evaluator applies EXHAUSTIVE verification before accepting `complete`
 
 ## Role Profiles And Model Selection
 
 Model/provider selection is role-based, not job-global.
 
 Defaults from `DefaultRoleProfiles()`:
-- target pipeline: director, evaluator -> `opus`; executor, reviewer -> `sonnet`
+- target pipeline: director, evaluator -> `opus`; executor -> `sonnet`
 - migration compatibility: legacy planner/leader/tester override keys may still appear in persisted inputs while the director transition is being rolled out
 
 Resolution path in `SessionManager`:
@@ -402,8 +402,7 @@ Evaluator prompt:
 
 Worker prompt roles:
 - Executor prompts remain implementation-focused and add ambition-specific autonomy guidance.
-- Reviewer prompts are adversarial: they search for counterexamples, contract violations, regressions, lifecycle/retry/recovery/idempotency issues, and state-transition problems.
-- `task_type="audit"` routes to the reviewer role and uses the same adversarial prompt family, but instructs the worker to stay focused on risk discovery and contract validation rather than unrelated implementation.
+- Evaluator prompts are adversarial: they read artifacts directly and search for counterexamples, contract violations, regressions, lifecycle/retry/recovery/idempotency issues, and state-transition problems. Verification depth scales with pipeline_mode (QUICK/THOROUGH/EXHAUSTIVE).
 
 ## Adaptive Decomposition (strictness=auto)
 
@@ -430,7 +429,7 @@ Fallback:
 `buildPlannerPrompt()` in protocol.go includes several sections beyond the raw job JSON.
 
 Role profiles section:
-- A formatted list of all role profiles (planner, leader, executor, reviewer, tester, evaluator) is appended.
+- A formatted list of all role profiles (planner, leader, executor, tester, evaluator) is appended.
 - Each entry shows `role: provider/model`, e.g. `executor: claude/sonnet`.
 - This informs the planner's `recommended_strictness` and `recommended_max_steps` so it can calibrate for actual model capability.
 
@@ -446,5 +445,5 @@ Measurable acceptance criteria:
 
 Worker prompt behavior:
 - Executor prompts stay implementation-focused.
-- Reviewer prompts are adversarial: they search for counterexamples, contract violations, regressions, lifecycle/retry/recovery/idempotency issues, and state-transition problems.
+- Evaluator prompts are adversarial: they read artifacts directly and search for counterexamples, contract violations, regressions, lifecycle/retry/recovery/idempotency issues, and state-transition problems.
 - Tester prompts are verification-focused: they prefer executable evidence and treat missing or contradictory evidence as failure unless the block is genuinely external.

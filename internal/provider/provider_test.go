@@ -288,20 +288,21 @@ func TestSessionManagerUsesRoleOverrideProvidersAcrossRoles(t *testing.T) {
 			want: "executor-provider:worker:implement",
 		},
 		{
-			name: "worker reviewer",
+			// review task_type now routes to executor (reviewer merged into evaluator)
+			name: "worker reviewer routes to executor",
 			job: domain.Job{
 				Provider: domain.ProviderName("global-provider"),
 				RoleProfiles: domain.RoleProfiles{
-					Reviewer: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "reviewer-profile-model"},
+					Executor: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "executor-profile-model"},
 				},
 				RoleOverrides: map[string]domain.RoleOverride{
-					"reviewer": {Provider: domain.ProviderName("reviewer-provider"), Model: "reviewer-override-model"},
+					"executor": {Provider: domain.ProviderName("executor-provider"), Model: "executor-override-model"},
 				},
 			},
 			run: func(job domain.Job) (string, error) {
 				return manager.RunWorker(context.Background(), job, domain.LeaderOutput{TaskType: "review"})
 			},
-			want: "reviewer-provider:worker:review",
+			want: "executor-provider:worker:review",
 		},
 		{
 			name: "worker test routes to executor",
@@ -422,20 +423,21 @@ func TestSessionManagerRoleOverridesFallBackCleanly(t *testing.T) {
 			want: "executor-override-provider:executor:executor-profile-model",
 		},
 		{
-			name: "reviewer override model keeps role profile provider",
+			// review routes to executor now that reviewer is merged into evaluator
+			name: "review task uses executor override provider",
 			job: domain.Job{
 				Provider: domain.ProviderName("global-provider"),
 				RoleProfiles: domain.RoleProfiles{
-					Reviewer: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "reviewer-profile-model"},
+					Executor: domain.ExecutionProfile{Provider: domain.ProviderName("role-profile-provider"), Model: "executor-profile-model"},
 				},
 				RoleOverrides: map[string]domain.RoleOverride{
-					"reviewer": {Model: "reviewer-override-model"},
+					"executor": {Provider: domain.ProviderName("executor-override-provider")},
 				},
 			},
 			run: func(job domain.Job) (string, error) {
 				return manager.RunWorker(context.Background(), job, domain.LeaderOutput{TaskType: "review"})
 			},
-			want: "role-profile-provider:reviewer:reviewer-override-model",
+			want: "executor-override-provider:executor:executor-profile-model",
 		},
 		{
 			name: "test tasks use executor override provider",
@@ -1340,97 +1342,6 @@ func TestEvaluatorPromptIncludesAmbitionGuidance(t *testing.T) {
 	}
 }
 
-func TestReviewerPromptUsesAdversarialGuidance(t *testing.T) {
-	t.Parallel()
-
-	prompt := buildWorkerPrompt(domain.Job{
-		Goal:        "Harden restart safety",
-		Provider:    domain.ProviderMock,
-		Constraints: []string{"Do not break retry idempotency"},
-	}, domain.LeaderOutput{
-		Action:   "run_worker",
-		Target:   "C",
-		TaskType: "review",
-		TaskText: "Review the recovery patch for regressions\n\ntask_why: validate lifecycle safety before completion\n\nscope_boundary: stay within the recovery patch and adjacent tests",
-	})
-
-	if !strings.Contains(prompt, "You are a reviewer component") {
-		t.Fatal("expected reviewer-specific prompt")
-	}
-	if !strings.Contains(prompt, "look for counterexamples") {
-		t.Fatal("expected adversarial reviewer guidance")
-	}
-	if !strings.Contains(prompt, "idempotency") || !strings.Contains(prompt, "state-transition") {
-		t.Fatal("expected reviewer prompt to mention lifecycle invariants")
-	}
-	if !strings.Contains(prompt, "Task why:\nvalidate lifecycle safety before completion") {
-		t.Fatal("expected reviewer prompt to render parsed task why")
-	}
-	if !strings.Contains(prompt, "Invariants to preserve:\n- Do not break retry idempotency") {
-		t.Fatal("expected reviewer prompt to render invariants")
-	}
-}
-
-func TestReviewerAndExecutorPromptsKeepRoleSpecificBehaviorWithAmbition(t *testing.T) {
-	t.Parallel()
-
-	job := domain.Job{
-		Goal:          "Keep non-executor prompt branches stable",
-		Provider:      domain.ProviderMock,
-		AmbitionLevel: domain.AmbitionLevelHigh,
-	}
-
-	reviewerPrompt := buildWorkerPrompt(job, domain.LeaderOutput{
-		Action:   "run_worker",
-		Target:   "C",
-		TaskType: "review",
-		TaskText: "Review the implementation for regressions",
-	})
-	if !strings.Contains(reviewerPrompt, "You are a reviewer component") {
-		t.Fatal("expected reviewer branch to remain active")
-	}
-	if strings.Contains(reviewerPrompt, "Autonomy guidance:") {
-		t.Fatal("reviewer prompt should not include executor ambition guidance")
-	}
-
-	executorPrompt := buildWorkerPrompt(job, domain.LeaderOutput{
-		Action:   "run_worker",
-		Target:   "D",
-		TaskType: "test",
-		TaskText: "Run the verification checks",
-	})
-	if !strings.Contains(executorPrompt, "You are an executor worker") {
-		t.Fatal("expected test tasks to use executor prompt guidance")
-	}
-	if !strings.Contains(executorPrompt, "Autonomy guidance:") {
-		t.Fatal("executor prompt should include executor ambition guidance")
-	}
-}
-
-func TestAuditTaskUsesReviewerPromptBranch(t *testing.T) {
-	t.Parallel()
-
-	prompt := buildWorkerPrompt(domain.Job{
-		Goal:     "Check restart and retry safety",
-		Provider: domain.ProviderMock,
-	}, domain.LeaderOutput{
-		Action:   "run_worker",
-		Target:   "C",
-		TaskType: "audit",
-		TaskText: "Audit lifecycle and retry invariants for hidden regressions",
-	})
-
-	if !strings.Contains(prompt, "Assigned audit task") {
-		t.Fatal("expected audit task to use reviewer/audit prompt branch")
-	}
-	if !strings.Contains(prompt, "risk discovery and contract validation") {
-		t.Fatal("expected audit prompt to stay risk-focused")
-	}
-	if !strings.Contains(prompt, "Task why:") || !strings.Contains(prompt, "Scope boundary:") {
-		t.Fatal("expected audit prompt to include contextual sections")
-	}
-}
-
 func TestWorkerPromptRendersContextSectionsAcrossRoles(t *testing.T) {
 	t.Parallel()
 
@@ -1448,7 +1359,8 @@ func TestWorkerPromptRendersContextSectionsAcrossRoles(t *testing.T) {
 		roleText string
 	}{
 		{name: "executor", taskType: "implement", roleText: "You are an executor worker"},
-		{name: "reviewer", taskType: "review", roleText: "You are a reviewer component"},
+		// review now routes to executor; reviewer role was merged into evaluator
+		{name: "review routes to executor", taskType: "review", roleText: "You are an executor worker"},
 		{name: "test routes to executor", taskType: "test", roleText: "You are an executor worker"},
 	}
 
@@ -1494,11 +1406,13 @@ func TestLeaderPromptIncludesRunWorkersGuidance(t *testing.T) {
 	if !strings.Contains(prompt, "2 worker") {
 		t.Fatal("expected leader prompt to mention parallel worker limit")
 	}
-	if !strings.Contains(prompt, "dispatch an explicit review step") {
-		t.Fatal("expected leader prompt to include conditional audit guidance")
+	// Reviewer role merged into evaluator: prompt now instructs leader that
+	// evaluator handles verification -- no separate review step needed.
+	if !strings.Contains(prompt, "evaluator will verify for regressions and counterexamples") {
+		t.Fatal("expected leader prompt to mention evaluator verification")
 	}
-	if !strings.Contains(prompt, `"audit"`) {
-		t.Fatal("expected leader prompt to mention audit task type")
+	if !strings.Contains(prompt, "you do not need to dispatch a separate review step") {
+		t.Fatal("expected leader prompt to mention no separate review step needed")
 	}
 	if !strings.Contains(prompt, "Planning invariants to preserve:\n- Keep reviewer/tester separation intact") {
 		t.Fatal("expected leader prompt to include planning invariants")
@@ -1900,42 +1814,6 @@ func TestBuildWorkerPromptExecutorOmitsVerificationContract(t *testing.T) {
 	// Workspace info must still be present.
 	if !strings.Contains(prompt, "/workspace/nocontract-test") {
 		t.Fatal("executor prompt must still include workspace_dir")
-	}
-}
-
-func TestBuildWorkerPromptReviewerOmitsFullJobJSON(t *testing.T) {
-	t.Parallel()
-
-	job := domain.Job{
-		ID:           "job-compact-rev-02",
-		Goal:         "Test compact reviewer payload omits full job JSON",
-		Provider:     domain.ProviderMock,
-		WorkspaceDir: "/workspace/rev-test",
-		RunOwnerID:   "svc-sentinel-rev",
-		Steps: []domain.Step{
-			{Index: 1, TaskType: "implement", Status: domain.StepStatusSucceeded,
-				Summary:     "changed protocol.go to use compact payloads",
-				DiffSummary: "+buildCompact -fullJobDump"},
-		},
-	}
-	task := domain.LeaderOutput{
-		Action: "run_worker", Target: "C", TaskType: "review",
-		TaskText: "Review the compact payload change",
-	}
-
-	prompt := buildWorkerPrompt(job, task)
-
-	// Full job JSON sentinel field must NOT appear.
-	if strings.Contains(prompt, "svc-sentinel-rev") {
-		t.Fatal("reviewer prompt must not include run_owner_id from full job JSON")
-	}
-
-	// Diff summary evidence must be present so the reviewer can review the change.
-	if !strings.Contains(prompt, "+buildCompact -fullJobDump") {
-		t.Fatal("reviewer prompt must include diff_summary from implement step")
-	}
-	if !strings.Contains(prompt, "You are a reviewer component") {
-		t.Fatal("expected reviewer role prompt")
 	}
 }
 

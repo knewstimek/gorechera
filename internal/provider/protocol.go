@@ -324,6 +324,18 @@ func buildEvaluatorPrompt(job domain.Job) string {
 		rubricSection = b.String()
 	}
 
+	// depthGuidance scales verification effort to pipeline_mode.
+	pipelineMode := domain.NormalizePipelineMode(job.PipelineMode)
+	var depthGuidance string
+	switch pipelineMode {
+	case string(domain.PipelineModeLight):
+		depthGuidance = "Verification depth: QUICK. Check engine results and verify goal satisfaction by reading key changed files. Focus on correctness, not style."
+	case string(domain.PipelineModeFull):
+		depthGuidance = "Verification depth: EXHAUSTIVE. Read all changed files plus adjacent code. Hunt for counterexamples, regressions, and edge cases beyond the immediate scope."
+	default:
+		depthGuidance = "Verification depth: THOROUGH. Read all changed files, check edge cases, verify goal alignment. Report concrete issues only."
+	}
+
 	// schemaRetrySection is injected when a previous evaluator attempt produced
 	// an invalid response so the model knows exactly what to correct.
 	schemaRetrySection := ""
@@ -352,13 +364,22 @@ EVALUATION PROCEDURE:
 5. Use status="failed" when the evidence shows missing coverage, unmet acceptance criteria, regressions, or unresolved failed/blocked work.
 6. Use status="blocked" only when the available evidence is genuinely insufficient or ambiguous even after reading the job state.
 7. Prefer concrete missing_step_types and evidence over vague reasons.
+
+VERIFICATION PROCEDURE:
+- Read the artifact files listed in the job state to inspect detailed engine results and worker outputs.
+- Read the actual source files that were changed (infer from step summaries and artifacts) and verify they satisfy the goal.
+- Check input/output contracts, invariants, edge cases.
+- Look for lifecycle, restart, retry, recovery, idempotency, and state-transition issues when relevant.
+- Look for missing validation, hidden regressions, and contradictions between artifacts, summaries, and actual code.
+
+%s
 %s%s
 Current job state:
 %s
 
 Verification contract:
 %s
-`, ambitionEvaluationGuidance(job.AmbitionLevel, job.AmbitionText), job.Goal, rubricSection, schemaRetrySection, buildCompactEvaluatorPayload(job), contractPayload))
+`, ambitionEvaluationGuidance(job.AmbitionLevel, job.AmbitionText), job.Goal, rubricSection, depthGuidance, schemaRetrySection, buildCompactEvaluatorPayload(job), contractPayload))
 	return applyPromptOverrides(base, "evaluator", job.WorkspaceDir, job.PromptOverrides)
 }
 
@@ -394,16 +415,20 @@ func buildLeaderPrompt(job domain.Job) string {
 		`- [no test files] in engine test artifacts is normal -- it means the package has no _test.go files, NOT a test failure. Do not retry or attempt to fix this.`,
 		`- If required step coverage is missing, dispatch the missing work instead of choosing complete.`,
 		`- Do NOT use summarize as a substitute for complete. Summarize is only for recording intermediate progress between worker dispatches. If all required work is done and verified, choose complete immediately. Do not summarize more than once consecutively.`,
-		`- If the change touches lifecycle, restart, retry, recovery, concurrency, deduplication, external pricing/config, authentication boundaries, or UI/event-delivery boundaries, dispatch an explicit review step that hunts for regressions and counterexamples before choosing complete.`,
+		`- If the change touches lifecycle, restart, retry, recovery, concurrency, deduplication, external pricing/config, authentication boundaries, or UI/event-delivery boundaries, the evaluator will verify for regressions and counterexamples -- you do not need to dispatch a separate review step.`,
 	}
 	switch pipelineMode {
 	case string(domain.PipelineModeLight):
 		completionRules = append(completionRules,
-			`- Pipeline mode is light. Skip reviewer fan-out unless the supervisor explicitly asks for it or the goal is blocked without review evidence.`,
+			`- Pipeline mode is light. After implement succeeds and engine checks pass, the evaluator performs quick verification. If the evaluator fails, you will receive specific findings in context -- dispatch fix steps to address them before re-completing.`,
+		)
+	case string(domain.PipelineModeFull):
+		completionRules = append(completionRules,
+			`- Pipeline mode is full. After implement succeeds and engine checks pass, the evaluator performs exhaustive code review including adjacent code and edge cases. If the evaluator fails, you will receive specific findings in context -- dispatch fix steps to address them before re-completing.`,
 		)
 	default:
 		completionRules = append(completionRules,
-			`- Pipeline mode requires reviewer coverage before completion. After implement succeeds, dispatch review or audit work before choosing complete.`,
+			`- After implement succeeds and engine checks pass, the evaluator performs thorough code review. If the evaluator fails, you will receive specific findings in context -- dispatch fix steps to address them before re-completing.`,
 		)
 	}
 	if strings.EqualFold(strictnessLevel, "strict") {
@@ -433,7 +458,7 @@ IMPORTANT: Use run_worker (not run_system) for file creation, code writing, and 
 Workers can create files, write code, and perform shell actions in the workspace.
 run_system is for build/lint/test/search commands only: allowed executables are go, rg, grep, cargo, make, npm.
 
-For run_worker: set action="run_worker", target=one of "B"/"C"/"D", task_type=one of "implement"/"review"/"audit"/"test"/"search"/"build"/"lint"/"command", task_text=full description of what to do
+For run_worker: set action="run_worker", target=one of "B"/"C"/"D", task_type=one of "implement"/"test"/"search"/"build"/"lint"/"command", task_text=full description of what to do
 For run_workers: set action="run_workers", tasks=array of exactly 2 task objects with distinct targets
 For run_system: set action="run_system", target="SYS", task_type=one of "build"/"test"/"lint"/"search"/"command", system_action.command=single allowed executable, system_action.args=array
 For summarize: set action="summarize", reason=summary text
@@ -705,10 +730,11 @@ func buildCompactReviewerPayload(job domain.Job, task domain.LeaderOutput) strin
 // Role profiles are included so the evaluator knows which models ran each role.
 func buildCompactEvaluatorPayload(job domain.Job) string {
 	type stepEvidence struct {
-		Index    int    `json:"index"`
-		TaskType string `json:"task_type"`
-		Status   string `json:"status"`
-		Summary  string `json:"summary,omitempty"`
+		Index     int      `json:"index"`
+		TaskType  string   `json:"task_type"`
+		Status    string   `json:"status"`
+		Summary   string   `json:"summary,omitempty"`
+		Artifacts []string `json:"artifacts,omitempty"`
 	}
 	type compactPayload struct {
 		JobID        string              `json:"job_id,omitempty"`
@@ -722,14 +748,15 @@ func buildCompactEvaluatorPayload(job domain.Job) string {
 	steps := make([]stepEvidence, 0, len(job.Steps))
 	for _, s := range job.Steps {
 		summary := s.Summary
-		if len([]rune(summary)) > 150 {
-			summary = string([]rune(summary)[:150]) + "..."
+		if len([]rune(summary)) > 500 {
+			summary = string([]rune(summary)[:500]) + "..."
 		}
 		steps = append(steps, stepEvidence{
-			Index:    s.Index,
-			TaskType: s.TaskType,
-			Status:   string(s.Status),
-			Summary:  summary,
+			Index:     s.Index,
+			TaskType:  s.TaskType,
+			Status:    string(s.Status),
+			Summary:   summary,
+			Artifacts: s.Artifacts,
 		})
 	}
 	out := compactPayload{
@@ -847,70 +874,16 @@ func parseTaskSectionHeader(line string) (string, string, bool) {
 
 func buildWorkerPrompt(job domain.Job, task domain.LeaderOutput) string {
 	taskPayload, _ := json.MarshalIndent(task, "", "  ")
-	contractPayload := "{}"
 	taskContext := parseWorkerTaskContext(task.TaskText, job.LeaderContextSummary)
 	invariantsSection := formatPromptList(job.Constraints, "- None provided.")
-	if job.VerificationContract != nil {
-		if data, err := json.MarshalIndent(job.VerificationContract, "", "  "); err == nil {
-			contractPayload = string(data)
-		}
-	}
 	// schemaRetrySection is injected when a previous attempt produced an
 	// invalid response so the model knows exactly what to correct.
 	schemaRetrySection := ""
 	if strings.TrimSpace(job.SchemaRetryHint) != "" {
 		schemaRetrySection = fmt.Sprintf("\nCORRECTION REQUIRED: Your previous response failed schema validation: %s\nRespond with valid JSON matching the required schema.\n", job.SchemaRetryHint)
 	}
-	// Worker prompts are role-specific even though they share one transport.
-	// This keeps the director broad while making reviewer behavior
-	// explicit and testable instead of relying on task_text phrasing alone.
-	switch domain.RoleForTaskType(task.TaskType) {
-	case domain.RoleReviewer:
-		reviewerLabel := "review"
-		if strings.EqualFold(strings.TrimSpace(task.TaskType), "audit") {
-			reviewerLabel = "audit"
-		}
-		reviewerBase := strings.TrimSpace(fmt.Sprintf(`
-TASK: You are a reviewer component assigned by the director. You are not the primary implementer for this step. Your job is to challenge the proposed change, look for counterexamples, and surface concrete risks before the job is allowed to complete.
-The assigned %s task below is complete and ready to execute. Do it now -- do not ask for input.
-Output only a JSON object matching the schema. No conversation, no preamble.
-status MUST be one of: success, failed, blocked.
-%s
-Overall job goal: %s
-
-Task objective:
-%s
-
-Task why:
-%s
-
-Invariants to preserve:
-%s
-
-Scope boundary:
-%s
-
-Assigned %s task payload:
-%s
-
-Review procedure:
-- Assume the change may be wrong until you can justify that it is safe.
-- Check input/output contracts, invariants, edge cases, and whether the task actually satisfies the goal.
-- Explicitly look for lifecycle, restart, retry, recovery, idempotency, duplicate-execution, and state-transition issues when relevant.
-- Look for missing validation, hidden regressions, and contradictions between artifacts, summaries, and actual code.
-- For audit tasks, stay focused on risk discovery and contract validation; do not expand scope into unrelated implementation.
-- Report success only when you cannot find a material defect in the reviewed scope.
-- Report failed when you find a concrete bug, regression, unsafe assumption, or missing required evidence.
-- Report blocked only when the evidence needed for a real review is missing.
-
-Job state:
-%s
-
-Verification contract:
-%s
-`, reviewerLabel, schemaRetrySection, job.Goal, taskContext.Objective, taskContext.Why, invariantsSection, taskContext.ScopeBoundary, reviewerLabel, string(taskPayload), buildCompactReviewerPayload(job, task), contractPayload))
-		return applyPromptOverrides(reviewerBase, "reviewer", job.WorkspaceDir, job.PromptOverrides)
-	}
+	// RoleReviewer case removed: review/audit task_types now route to executor.
+	// The evaluator performs code verification instead of a separate reviewer worker.
 	executorBase := strings.TrimSpace(fmt.Sprintf(`
 TASK: You are an executor worker assigned by the director. You perform the task described below. Report results accurately including files changed, commands run, and any errors encountered.
 The assigned task below is complete and ready to execute. Do it now -- do not ask for input.

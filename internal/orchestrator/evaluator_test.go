@@ -255,7 +255,9 @@ func TestMergeEvaluatorReportNoRubric(t *testing.T) {
 	}
 }
 
-func TestBuildSprintContractBalancedRequiresReview(t *testing.T) {
+func TestBuildSprintContractBalancedRequiresImplementOnly(t *testing.T) {
+	// Reviewer merged into evaluator: balanced pipeline no longer requires a
+	// separate review step type. The evaluator performs code verification.
 	t.Parallel()
 
 	contract := buildSprintContract(domain.Job{
@@ -263,11 +265,11 @@ func TestBuildSprintContractBalancedRequiresReview(t *testing.T) {
 		PipelineMode: string(domain.PipelineModeBalanced),
 	}, domain.PlanningArtifact{})
 
-	if len(contract.RequiredStepTypes) != 2 || contract.RequiredStepTypes[0] != "implement" || contract.RequiredStepTypes[1] != "review" {
-		t.Fatalf("expected implement and review to be required, got %v", contract.RequiredStepTypes)
+	if len(contract.RequiredStepTypes) != 1 || contract.RequiredStepTypes[0] != "implement" {
+		t.Fatalf("expected only implement to be required, got %v", contract.RequiredStepTypes)
 	}
-	if contract.ThresholdSuccessCnt != 2 {
-		t.Fatalf("expected success threshold 2, got %d", contract.ThresholdSuccessCnt)
+	if contract.ThresholdSuccessCnt != 1 {
+		t.Fatalf("expected success threshold 1, got %d", contract.ThresholdSuccessCnt)
 	}
 }
 

@@ -280,10 +280,12 @@ func TestBuildWorkerPrompt_AppliesExecutorOverride(t *testing.T) {
 	}
 }
 
-func TestBuildWorkerPrompt_AppliesReviewerOverride(t *testing.T) {
+func TestBuildWorkerPrompt_ReviewTaskUsesExecutorOverride(t *testing.T) {
+	// review task_type routes to executor now that reviewer is merged into evaluator.
+	// The "executor" override key applies to review tasks.
 	t.Parallel()
 	dir := t.TempDir()
-	jobOverrides := map[string]string{"reviewer": "Focus on concurrency bugs."}
+	jobOverrides := map[string]string{"executor": "Focus on concurrency bugs."}
 
 	job := minimalJob(dir, jobOverrides)
 	task := domain.LeaderOutput{
@@ -295,7 +297,7 @@ func TestBuildWorkerPrompt_AppliesReviewerOverride(t *testing.T) {
 	result := buildWorkerPrompt(job, task)
 
 	if !strings.HasPrefix(result, "Focus on concurrency bugs.") {
-		t.Fatalf("reviewer job override not at front, got: %q", result[:min(200, len(result))])
+		t.Fatalf("executor job override not at front for review task, got: %q", result[:min(200, len(result))])
 	}
 }
 

@@ -48,9 +48,9 @@ Start a new job. Returns `Job` object immediately; pipeline runs in background.
 | role_overrides | object | no | - | Per-role provider/model overrides (see below) |
 
 `pipeline_mode`:
-- `light` -- director -> executor -> evaluator (skip reviewer)
-- `balanced` -- adds reviewer pass
-- `full` -- adds fix loops and parallel workers
+- `light` -- director -> executor -> evaluator (QUICK verification)
+- `balanced` -- evaluator performs THOROUGH verification including code review
+- `full` -- evaluator performs EXHAUSTIVE verification; adds fix loops and parallel workers
 
 `role_overrides` shape:
 ```json
@@ -60,7 +60,7 @@ Start a new job. Returns `Job` object immediately; pipeline runs in background.
   "evaluator": { "provider": "claude", "model": "opus" }
 }
 ```
-Supported role keys: `director`, `planner`, `leader`, `executor`, `reviewer`, `tester`, `evaluator`.
+Supported role keys: `director`, `planner`, `leader`, `executor`, `tester`, `evaluator`.
 
 Example:
 ```json

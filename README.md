@@ -6,7 +6,7 @@ Go stateful multi-agent orchestration engine / harness engineering with self-imp
 
 ## Features
 
-- **4-role pipeline**: director -> executor -> [engine build/test] -> reviewer -> evaluator
+- **3-agent pipeline**: director -> executor -> [engine build/test] -> evaluator
 - **3 strictness levels**: strict (implement+review+test), normal (implement only), lenient (results only)
 - **3 context modes**: full, summary, minimal -- controls director prompt payload size
 - **Job chaining**: sequential multi-goal execution with automatic advancement
@@ -38,9 +38,9 @@ go run ./cmd/gorchera status -all
 
 Gorchera supports three pipeline modes to balance quality vs cost:
 
-- **light** (default): director -> executor -> engine build/test -> evaluator. Fastest and cheapest. Skip reviewer. Good for simple changes.
-- **balanced**: Adds reviewer before evaluator. Good for moderate changes where code review catches bugs.
-- **full**: Adds fix loops and parallel workers. For complex, risky changes.
+- **light** (default): director -> executor -> engine build/test -> evaluator. Fastest and cheapest. Evaluator performs QUICK verification. Good for simple changes.
+- **balanced**: Evaluator performs THOROUGH verification including code review and contract checks. Good for moderate changes.
+- **full**: Evaluator performs EXHAUSTIVE verification with fix loops and parallel workers. For complex, risky changes.
 
 Light mode with cross-provider (director=GPT, executor=Claude Sonnet) costs ~$0.04 per job.
 

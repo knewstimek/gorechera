@@ -209,13 +209,9 @@ func buildSprintContract(job domain.Job, planning domain.PlanningArtifact) domai
 }
 
 func pipelineRequiredStepTypes(job domain.Job) []string {
-	required := []string{"implement"}
-	switch domain.NormalizePipelineMode(job.PipelineMode) {
-	case string(domain.PipelineModeLight):
-		return required
-	default:
-		return append(required, "review")
-	}
+	// Reviewer role merged into evaluator: "review" is no longer a required step
+	// type in the pipeline. The evaluator performs code verification instead.
+	return []string{"implement"}
 }
 
 // normalizeStrictnessLevel canonicalises the level string and falls back to

@@ -90,9 +90,8 @@ Leader context:
 - Keep prompt guidance abstract and failure-mode oriented. Encode categories like contract violations, lifecycle/retry/recovery safety, duplicate execution, contradictory evidence, and external contract drift rather than project-specific bug examples.
 - Role prompts should stay distinct:
   - executor: implementation
-  - reviewer/audit: adversarial counterexample and invariant checking
+  - evaluator: adversarial counterexample and invariant checking + completion gate (depth varies with pipeline_mode)
   - tester: executable verification
-  - evaluator: completion gate, not implementation cheerleading
 
 ## Verification Contract Rules
 
@@ -235,7 +234,7 @@ Strictness levels control which step types are required and how the evaluator in
 
 - Prefer focused table-driven tests for validation and routing.
 - Use end-to-end mock-provider tests for orchestrator loop behavior.
-- When changing provider routing, cover leader, planner, evaluator, executor, reviewer, and tester paths explicitly.
+- When changing provider routing, cover leader, planner, evaluator, executor, and tester paths explicitly.
 - When changing chain behavior, cover both happy-path advancement and terminal interruption cases.
 
 ## Documentation Rules

@@ -1333,7 +1333,7 @@ func (p retryControlProvider) RunLeader(_ context.Context, job domain.Job) (stri
 	case 0:
 		return `{"action":"run_worker","target":"B","task_type":"implement","task_text":"implement the first step"}`, nil
 	case 1:
-		return `{"action":"run_worker","target":"C","task_type":"review","task_text":"review the first step"}`, nil
+		return `{"action":"run_worker","target":"C","task_type":"search","task_text":"search for regressions in the first step"}`, nil
 	case 2:
 		return `{"action":"run_worker","target":"D","task_type":"test","task_text":"test the first step"}`, nil
 	default:
@@ -1363,7 +1363,7 @@ func (p approvalControlProvider) RunLeader(_ context.Context, job domain.Job) (s
 	case 2:
 		return `{"action":"run_worker","target":"B","task_type":"implement","task_text":"implement approved system change"}`, nil
 	case 3:
-		return `{"action":"run_worker","target":"C","task_type":"review","task_text":"review approved system change"}`, nil
+		return `{"action":"run_worker","target":"C","task_type":"search","task_text":"search for regressions in approved system change"}`, nil
 	case 4:
 		return `{"action":"run_worker","target":"D","task_type":"test","task_text":"test approved system change"}`, nil
 	default:
@@ -1388,7 +1388,7 @@ func (p roleRoutingLeaderProvider) RunLeader(_ context.Context, job domain.Job) 
 	case 0:
 		return `{"action":"run_worker","target":"B","task_type":"implement","task_text":"implement the first step"}`, nil
 	case 1:
-		return `{"action":"run_worker","target":"C","task_type":"review","task_text":"review the first step"}`, nil
+		return `{"action":"run_worker","target":"C","task_type":"search","task_text":"search for regressions in the first step"}`, nil
 	default:
 		return `{"action":"complete","target":"none","task_type":"none","reason":"all roles exercised"}`, nil
 	}
@@ -1507,7 +1507,7 @@ func (p phaseProvider) RunLeader(_ context.Context, job domain.Job) (string, err
 		case 0:
 			return `{"action":"run_worker","target":"B","task_type":"implement","task_text":"implement the first step"}`, nil
 		case 1:
-			return `{"action":"run_worker","target":"C","task_type":"review","task_text":"review the first step"}`, nil
+			return `{"action":"run_worker","target":"C","task_type":"search","task_text":"search for regressions in the first step"}`, nil
 		default:
 			return `{"action":"complete","target":"none","task_type":"none","reason":"all roles exercised"}`, nil
 		}
@@ -1531,7 +1531,9 @@ func (p phaseProvider) RunEvaluator(_ context.Context, job domain.Job) (string, 
 }
 
 func (p phaseProvider) RunWorker(_ context.Context, job domain.Job, task domain.LeaderOutput) (string, error) {
-	if task.TaskType == "review" {
+	// Check for engine evidence on the second worker step (search follows implement).
+	// Engine artifacts are added by the engine verification step after implement.
+	if task.TaskType == "search" {
 		if step := latestImplementStepForTest(job); step != nil && artifactListContains(step.Artifacts, "engine_build.json") && artifactListContains(step.Artifacts, "engine_test.json") {
 			p.trace.recordContract("engine")
 		}
@@ -1603,11 +1605,11 @@ func (p *parallelFanoutProvider) RunLeader(_ context.Context, job domain.Job) (s
 		switch len(job.Steps) {
 		case 0:
 			return leaderOutput("run_worker", "B", "implement", "build the core implementation",
-				parallelSpecArtifact("C", "review", "review the core implementation", "internal/orchestrator/parallel/review"),
+				parallelSpecArtifact("C", "search", "search for regressions in the core implementation", "internal/orchestrator/parallel/search"),
 			), nil
 		case 2:
 			if p.mode == "worker-failed" {
-				return leaderOutput("run_worker", "D", "review", "re-run the failed parallel review"), nil
+				return leaderOutput("run_worker", "D", "implement", "re-run the failed parallel search as implement"), nil
 			}
 		default:
 			return leaderOutput("complete", "none", "none", "parallel fan-out finished"), nil
@@ -1627,7 +1629,7 @@ func (p *parallelFanoutProvider) RunWorker(ctx context.Context, _ domain.Job, ta
 	}
 	p.mu.Unlock()
 
-	if p.mode == "success" && (task.TaskType == "implement" || task.TaskType == "review") && waitCh != nil {
+	if p.mode == "success" && (task.TaskType == "implement" || task.TaskType == "search") && waitCh != nil {
 		select {
 		case <-waitCh:
 		case <-ctx.Done():
@@ -1635,13 +1637,15 @@ func (p *parallelFanoutProvider) RunWorker(ctx context.Context, _ domain.Job, ta
 		}
 	}
 
-	if p.mode == "worker-failed" && task.TaskType == "review" {
+	// In worker-failed mode the parallel search worker fails on the first attempt;
+	// the leader then dispatches a recovery implement step which succeeds.
+	if p.mode == "worker-failed" && task.TaskType == "search" {
 		p.mu.Lock()
 		p.failures[task.TaskType]++
 		attempt := p.failures[task.TaskType]
 		p.mu.Unlock()
 		if attempt == 1 {
-			return `{"status":"failed","summary":"review worker failed","error_reason":"review worker failed"}`, nil
+			return `{"status":"failed","summary":"search worker failed","error_reason":"search worker failed"}`, nil
 		}
 	}
 
@@ -1699,7 +1703,7 @@ func TestServiceFansOutParallelWorkers(t *testing.T) {
 	if job.Steps[0].Target != "B" || job.Steps[0].TaskType != "implement" || job.Steps[0].Status != domain.StepStatusSucceeded {
 		t.Fatalf("unexpected primary step: %#v", job.Steps[0])
 	}
-	if job.Steps[1].Target != "C" || job.Steps[1].TaskType != "review" || job.Steps[1].Status != domain.StepStatusSucceeded {
+	if job.Steps[1].Target != "C" || job.Steps[1].TaskType != "search" || job.Steps[1].Status != domain.StepStatusSucceeded {
 		t.Fatalf("unexpected parallel step: %#v", job.Steps[1])
 	}
 	if !artifactListContains(job.Steps[0].Artifacts, "engine_build.json") || !artifactListContains(job.Steps[0].Artifacts, "engine_test.json") {
@@ -1740,7 +1744,7 @@ func TestServiceParallelWorkerFailureReturnsControlToLeader(t *testing.T) {
 		t.Fatalf("expected done status after leader recovery, got %s", job.Status)
 	}
 	if fanout.workerCalls() != 3 {
-		t.Fatalf("expected leader to keep control after the failed review worker, got %d calls", fanout.workerCalls())
+		t.Fatalf("expected leader to keep control after the failed search worker, got %d calls", fanout.workerCalls())
 	}
 	if len(job.Steps) != 3 {
 		t.Fatalf("expected 3 steps, got %d", len(job.Steps))
@@ -1749,10 +1753,10 @@ func TestServiceParallelWorkerFailureReturnsControlToLeader(t *testing.T) {
 		t.Fatalf("expected primary step to succeed, got %#v", job.Steps[0])
 	}
 	if job.Steps[1].Status != domain.StepStatusFailed {
-		t.Fatalf("expected failed parallel review step, got %#v", job.Steps[1])
+		t.Fatalf("expected failed parallel search step, got %#v", job.Steps[1])
 	}
-	if job.Steps[2].Status != domain.StepStatusSucceeded || job.Steps[2].TaskType != "review" {
-		t.Fatalf("expected recovery review step, got %#v", job.Steps[2])
+	if job.Steps[2].Status != domain.StepStatusSucceeded || job.Steps[2].TaskType != "implement" {
+		t.Fatalf("expected recovery implement step, got %#v", job.Steps[2])
 	}
 }
 
@@ -2052,7 +2056,6 @@ func TestServiceRoutesWorkerRolesByTaskType(t *testing.T) {
 	registry := provider.NewRegistry()
 	registry.Register(roleRoutingLeaderProvider{name: domain.ProviderName("role-routing-leader")})
 	registry.Register(roleRoutingWorkerProvider{name: domain.ProviderName("role-routing-executor")})
-	registry.Register(roleRoutingWorkerProvider{name: domain.ProviderName("role-routing-reviewer")})
 
 	service := orchestrator.NewService(
 		provider.NewSessionManager(registry),
@@ -2067,7 +2070,6 @@ func TestServiceRoutesWorkerRolesByTaskType(t *testing.T) {
 		RoleProfiles: domain.RoleProfiles{
 			Leader:    domain.ExecutionProfile{Provider: domain.ProviderName("role-routing-leader")},
 			Executor:  domain.ExecutionProfile{Provider: domain.ProviderName("role-routing-executor")},
-			Reviewer:  domain.ExecutionProfile{Provider: domain.ProviderName("role-routing-reviewer")},
 			Evaluator: domain.ExecutionProfile{Provider: domain.ProviderName("role-routing-leader")},
 		},
 		MaxSteps: 8,
@@ -2088,13 +2090,13 @@ func TestServiceRoutesWorkerRolesByTaskType(t *testing.T) {
 	}
 	want := []string{
 		"role-routing-executor handled implement",
-		"role-routing-reviewer handled review",
+		"role-routing-executor handled search",
 	}
 	if !strings.HasPrefix(got[0], want[0]) {
 		t.Fatalf("step 1 summary mismatch: got %q want prefix %q", got[0], want[0])
 	}
-	if got[1] != want[1] {
-		t.Fatalf("step 2 summary mismatch: got %q want %q", got[1], want[1])
+	if !strings.HasPrefix(got[1], want[1]) {
+		t.Fatalf("step 2 summary mismatch: got %q want prefix %q", got[1], want[1])
 	}
 }
 
@@ -2105,7 +2107,6 @@ func TestServiceRoutesPlannerAndEvaluatorThroughProviders(t *testing.T) {
 	registry.Register(phaseProvider{name: domain.ProviderName("planner-phase"), phase: "planner", trace: trace})
 	registry.Register(phaseProvider{name: domain.ProviderName("leader-phase"), phase: "leader", trace: trace})
 	registry.Register(phaseProvider{name: domain.ProviderName("executor-phase"), phase: "executor", trace: trace})
-	registry.Register(phaseProvider{name: domain.ProviderName("reviewer-phase"), phase: "reviewer", trace: trace})
 	registry.Register(phaseProvider{name: domain.ProviderName("evaluator-phase"), phase: "evaluator", trace: trace})
 
 	service := orchestrator.NewService(
@@ -2122,7 +2123,6 @@ func TestServiceRoutesPlannerAndEvaluatorThroughProviders(t *testing.T) {
 			Planner:   domain.ExecutionProfile{Provider: domain.ProviderName("planner-phase")},
 			Leader:    domain.ExecutionProfile{Provider: domain.ProviderName("leader-phase")},
 			Executor:  domain.ExecutionProfile{Provider: domain.ProviderName("executor-phase")},
-			Reviewer:  domain.ExecutionProfile{Provider: domain.ProviderName("reviewer-phase")},
 			Evaluator: domain.ExecutionProfile{Provider: domain.ProviderName("evaluator-phase")},
 		},
 		MaxSteps: 8,
@@ -2145,11 +2145,12 @@ func TestServiceRoutesPlannerAndEvaluatorThroughProviders(t *testing.T) {
 	if trace.leaderCalls() == 0 {
 		t.Fatal("expected leader phase to call provider")
 	}
-	if trace.workerCalls("executor-phase") == 0 || trace.workerCalls("reviewer-phase") == 0 {
-		t.Fatal("expected executor and reviewer worker phases to call providers")
+	// Both implement and search route to executor; verify executor was called for both steps.
+	if trace.workerCalls("executor-phase") < 2 {
+		t.Fatal("expected executor worker phase to handle both implement and search tasks")
 	}
 	if trace.engineEvidenceCalls() == 0 {
-		t.Fatal("expected review phase to observe engine verification evidence")
+		t.Fatal("expected search phase to observe engine verification evidence")
 	}
 }
 

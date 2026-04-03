@@ -27,8 +27,6 @@ var leaderTargets = map[string]struct{}{
 
 var leaderTaskTypes = map[string]struct{}{
 	"implement": {},
-	"review":    {},
-	"audit":     {},
 	"test":      {},
 	"search":    {},
 	"build":     {},

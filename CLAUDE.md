@@ -21,15 +21,15 @@ go test ./...
 
 ## Architecture
 
-- **4-role pipeline**: director -> executor -> [engine build/test] -> reviewer -> evaluator
-- **pipeline_mode**: light (default, skip reviewer) / balanced / full
+- **3-agent pipeline**: director -> executor -> [engine build/test] -> evaluator
+- **pipeline_mode**: light (QUICK eval) / balanced (THOROUGH eval) / full (EXHAUSTIVE eval)
 - **director** = planner + leader merged; engine = rule-based go build/test
-- Context compaction: executor/reviewer/evaluator get compact payloads
+- Context compaction: executor/evaluator get compact payloads
 - Cross-provider: role_overrides on start_job (e.g. director=codex, executor=claude)
 
 ## Recommended Profile
 
-provider=codex, executor/reviewer=claude sonnet. Result: GPT plans, Claude executes. ~$0.04/job light mode.
+provider=codex, executor=claude sonnet. Result: GPT plans, Claude executes. ~$0.04/job light mode.
 
 ## Docs
 

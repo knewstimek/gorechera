@@ -1381,9 +1381,11 @@ func (s *Service) runLoop(ctx context.Context, job *domain.Job) (result *domain.
 				return nil, err
 			}
 			if !report.Passed {
-				// An evaluator "blocked" result means the job is recoverable if the
-				// leader schedules the missing work, so keep the loop alive.
-				if report.Status == "blocked" {
+				// "blocked": evaluator lacks evidence -- recoverable, keep loop alive.
+				// "failed": evaluator found concrete defects -- feed findings back to
+				// the leader so it can dispatch fix steps before re-completing.
+				if report.Status == "blocked" || report.Status == "failed" {
+					job.LeaderContextSummary = report.Reason
 					completionRetryPending = true
 					completionRetryStepCount = len(job.Steps)
 					leaderRetryPending = true

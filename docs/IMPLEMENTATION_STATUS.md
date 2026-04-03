@@ -15,7 +15,7 @@ go test ./...    # PASS
 
 - Bounded orchestrator loop with persisted job state, step state, ordered events, and atomic JSON storage.
 - Provider-backed planner and evaluator phases, plus persisted planning artifacts and verification contracts.
-- Target pipeline redesign is in flight: control-plane surfaces now expose `pipeline_mode`, bounded resume `extra_steps`, and terminal-state notifications needed for the director/executor/[engine build+test]/reviewer/evaluator model.
+- Target pipeline redesign is in flight: control-plane surfaces now expose `pipeline_mode`, bounded resume `extra_steps`, and terminal-state notifications needed for the director/executor/[engine build+test]/evaluator model.
 - Evaluator-gated completion with strictness levels:
   - `strict`: requires succeeded `implement`, `review`, and `test`
   - `normal`: requires succeeded `implement`; verification can be satisfied by succeeded `test`, `build`, or `command`
@@ -26,11 +26,10 @@ go test ./...    # PASS
 - Jobs and chain goals carry `ambition_level` (`low | medium | high | custom`) and `ambition_text`. When level=custom and text is present, ambition_text fully replaces the default executor/evaluator guidance; when level is low/medium/high and text is present, it is prepended. Omitted or unrecognized level defaults to `medium`. See SUPERVISOR_GUIDE.md for exact default prompt text per level.
 - Role-specific worker prompts are differentiated:
   - executor: implementation-focused with ambition-aware autonomy guidance (`low` = fix only, `medium` = allow directly related improvements, `high` = allow justified structural expansion)
-  - reviewer: adversarial review focused on counterexamples, regressions, lifecycle/restart/retry/recovery/idempotency issues, and state-transition safety
-  - audit: routed through the reviewer role with the same adversarial prompt family, but constrained to risk discovery and contract validation
+  - evaluator: adversarial verification focused on counterexamples, regressions, lifecycle/restart/retry/recovery/idempotency issues, and state-transition safety; reads artifacts directly; depth scales with pipeline_mode (QUICK/THOROUGH/EXHAUSTIVE)
   - tester: verification-focused with executable evidence preferred over narrative claims
 - Evaluator prompt is gate-oriented, ambition-aware, and no longer treats a single succeeded implement step as sufficient evidence by itself.
-- Leader prompt includes a conditional high-risk review/audit trigger before completion for lifecycle/concurrency/deduplication/external-pricing/auth/UI-event-boundary changes.
+- Leader prompt includes a conditional high-risk flag before completion for lifecycle/concurrency/deduplication/external-pricing/auth/UI-event-boundary changes; triggers EXHAUSTIVE evaluator verification.
 - Leader summarize throttling: after two consecutive summarize turns, the service forces completion evaluation instead of allowing endless summary churn.
 - Repeated blocked-reason protection: the same blocked reason three times in a row escalates to job failure.
 - Startup recovery hardening:
@@ -94,7 +93,7 @@ go test ./...    # PASS
 
 ### Prompt overrides
 
-- Workspace file overrides: `.gorchera/prompts/{role}.md` is loaded at job start for each role (director, executor, reviewer, evaluator). File content is prepended to the built-in base prompt. If the first line is `# REPLACE`, the base prompt is replaced entirely instead.
+- Workspace file overrides: `.gorchera/prompts/{role}.md` is loaded at job start for each role (director, executor, evaluator). File content is prepended to the built-in base prompt. If the first line is `# REPLACE`, the base prompt is replaced entirely instead.
 - Job parameter overrides: `gorchera_start_job` accepts `prompt_overrides` (map of role -> text). Always prepend; replace mode is not available via job parameters.
 - Priority: job parameter > workspace file > default prompt. When both exist for a role, job parameter is prepended first.
 

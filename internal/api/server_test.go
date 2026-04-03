@@ -758,7 +758,7 @@ func (p apiControlProvider) RunLeader(_ context.Context, job domain.Job) (string
 	case 0:
 		return `{"action":"run_worker","target":"B","task_type":"implement","task_text":"build retry path"}`, nil
 	case 1:
-		return `{"action":"run_worker","target":"C","task_type":"review","task_text":"review retry path"}`, nil
+		return `{"action":"run_worker","target":"C","task_type":"search","task_text":"search for regressions in retry path"}`, nil
 	case 2:
 		return `{"action":"run_worker","target":"D","task_type":"test","task_text":"test retry path"}`, nil
 	default:
@@ -788,7 +788,7 @@ func (p approvalControlProvider) RunLeader(_ context.Context, job domain.Job) (s
 	case 2:
 		return `{"action":"run_worker","target":"B","task_type":"implement","task_text":"implement approved system change"}`, nil
 	case 3:
-		return `{"action":"run_worker","target":"C","task_type":"review","task_text":"review approved system change"}`, nil
+		return `{"action":"run_worker","target":"C","task_type":"search","task_text":"search for regressions in approved system change"}`, nil
 	case 4:
 		return `{"action":"run_worker","target":"D","task_type":"test","task_text":"test approved system change"}`, nil
 	default:
