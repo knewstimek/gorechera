@@ -21,6 +21,7 @@ Go stateful multi-agent orchestration engine / harness engineering with self-imp
 - **Error classification**: 12 error types with 3-strike retry policy
 - **Token tracking**: rough per-job and per-step token/cost estimation
 - **Security**: SUPERVISOR injection prevention, workspace validation, steer authorization
+- **Prompt overrides**: customize role prompts via workspace files or job parameters
 - **MCP server**: 17+ tools for supervisor agent integration (stdio JSON-RPC 2.0)
 
 ## Quick Start

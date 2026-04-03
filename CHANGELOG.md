@@ -3,6 +3,7 @@
 ## v2026.04.03
 
 ### Added
+- Prompt overrides: per-role prompt customization via .gorchera/prompts/{role}.md files (prepend or replace) and gorchera_start_job prompt_overrides parameter
 - Schema retry: director/executor/evaluator retry up to 2 times on schema validation failure before marking the step failed
 - pre_build_commands: gorchera_start_job accepts a pre_build_commands list; engine runs these commands before go build/test (language-agnostic setup, e.g. go mod tidy, npm install)
 - Worktree notification: terminal notifications for isolated worktree jobs include workspace_mode, workspace_dir, requested_workspace_dir, diff_stat

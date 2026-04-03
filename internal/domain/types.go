@@ -490,6 +490,12 @@ type Job struct {
 	// logged but do not prevent the build/test from running. Useful for
 	// language-agnostic setup steps such as "go mod tidy" or "npm install".
 	PreBuildCommands        []string                `json:"pre_build_commands,omitempty"`
+	// PromptOverrides carries per-role prompt fragments that the provider
+	// prepends to the hardcoded base prompt before each role call.
+	// Keys are role names (director, executor, reviewer, evaluator).
+	// Values are plain text prepended verbatim with a blank-line separator.
+	// Set at job creation time and never mutated during execution.
+	PromptOverrides         map[string]string       `json:"prompt_overrides,omitempty"`
 	SchemaRetryHint         string                  `json:"schema_retry_hint,omitempty"`
 	RunOwnerID              string                  `json:"run_owner_id,omitempty"`
 	RunHeartbeatAt          time.Time               `json:"run_heartbeat_at,omitempty"`
@@ -568,6 +574,14 @@ func CloneJob(src *Job) *Job {
 		dst.RoleOverrides = make(map[string]RoleOverride, len(src.RoleOverrides))
 		for k, v := range src.RoleOverrides {
 			dst.RoleOverrides[k] = v
+		}
+	}
+
+	// Deep-copy PromptOverrides map.
+	if len(src.PromptOverrides) > 0 {
+		dst.PromptOverrides = make(map[string]string, len(src.PromptOverrides))
+		for k, v := range src.PromptOverrides {
+			dst.PromptOverrides[k] = v
 		}
 	}
 

@@ -501,6 +501,10 @@ func toolList() []toolDef {
 						Description: "Commands to run before engine verification (e.g. go mod tidy, npm install). Runs in workspace directory. Best-effort: failures are logged but do not skip build/test.",
 						Items:       &schemaProp{Type: "string"},
 					},
+					"prompt_overrides": {
+						Type:        "object",
+						Description: "Per-role prompt overrides (prepend to default prompt). Keys: director, executor, evaluator, reviewer. Values: additional instructions prepended to the role's system prompt. Replace mode is not available via job parameters (use .gorchera/prompts/{role}.md with # REPLACE for that).",
+					},
 				},
 				Required: []string{"goal"},
 			},
@@ -865,6 +869,7 @@ func (s *Server) toolStartJob(ctx context.Context, args map[string]any) (toolRes
 		}
 	}
 	preBuildCmds := stringSliceArg(args, "pre_build_commands")
+	promptOverrides := parsePromptOverrides(args)
 
 	input := orchestrator.CreateJobInput{
 		Goal:             goal,
@@ -878,6 +883,7 @@ func (s *Server) toolStartJob(ctx context.Context, args map[string]any) (toolRes
 		RoleProfiles:     domain.DefaultRoleProfiles(provider),
 		RoleOverrides:    roleOverrides,
 		PreBuildCommands: preBuildCmds,
+		PromptOverrides:  promptOverrides,
 	}
 	setOptionalStringField(&input, "PipelineMode", pipelineMode)
 
@@ -958,6 +964,30 @@ func parseRoleOverrides(raw map[string]any) map[string]domain.RoleOverride {
 		result[role] = rp
 	}
 	return result
+}
+
+// parsePromptOverrides extracts the prompt_overrides object from the raw args
+// map and converts it to map[string]string. Non-string values are skipped.
+// Returns nil when the key is absent or contains no usable entries.
+func parsePromptOverrides(args map[string]any) map[string]string {
+	raw, ok := args["prompt_overrides"]
+	if !ok {
+		return nil
+	}
+	rawMap, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]string, len(rawMap))
+	for k, v := range rawMap {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			out[k] = s
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (s *Server) toolListJobs(ctx context.Context) (toolResult, error) {

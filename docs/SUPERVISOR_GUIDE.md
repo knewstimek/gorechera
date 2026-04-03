@@ -98,6 +98,42 @@ When a job enters the Blocked state it can be resumed from its current position 
 
 Example: `gorchera_resume(job_id="abc123", extra_steps=5)` gives 5 more steps and continues from the last checkpoint.
 
+## Prompt Overrides
+
+Role prompts can be customized without modifying source code.
+
+### Workspace files
+
+Place markdown files under `.gorchera/prompts/` named after the role:
+
+- `director.md`, `executor.md`, `evaluator.md`, `reviewer.md`
+
+Default behavior: the file content is prepended before the built-in base prompt.
+If the first line is exactly `# REPLACE`, the base prompt is discarded entirely.
+
+Warning: `# REPLACE` on evaluator removes the evaluator gate instructions. Only use it
+if you are providing a fully equivalent gate constraint in the file.
+
+### Job parameter
+
+Pass `prompt_overrides` in `gorchera_start_job` (always prepend, no replace mode):
+
+```json
+{
+  "prompt_overrides": {
+    "executor": "Always write tests first.",
+    "evaluator": "Reject if no tests are added."
+  }
+}
+```
+
+### Priority
+
+job parameter > workspace file > default prompt
+
+When both a job parameter and a workspace file exist for the same role, the job parameter
+text is prepended first, then the workspace file text, then the base prompt.
+
 ## pre_build_commands
 
 Run arbitrary setup commands in the workspace directory before engine verification

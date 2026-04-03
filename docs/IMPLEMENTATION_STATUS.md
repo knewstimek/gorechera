@@ -92,6 +92,12 @@ go test ./...    # PASS
   - disabled when blank or equal to the primary model
   - does not replace `fallback_provider` lookup or retry invalid structured output
 
+### Prompt overrides
+
+- Workspace file overrides: `.gorchera/prompts/{role}.md` is loaded at job start for each role (director, executor, reviewer, evaluator). File content is prepended to the built-in base prompt. If the first line is `# REPLACE`, the base prompt is replaced entirely instead.
+- Job parameter overrides: `gorchera_start_job` accepts `prompt_overrides` (map of role -> text). Always prepend; replace mode is not available via job parameters.
+- Priority: job parameter > workspace file > default prompt. When both exist for a role, job parameter is prepended first.
+
 ### Schema retry and pre_build_commands
 
 - Schema retry: director, executor, and evaluator roles retry up to 2 additional times when the provider returns a response that fails schema validation. After 3 total failures the step is marked failed with `schema` classification.
@@ -174,6 +180,7 @@ go test ./...    # PASS
   - `gorchera_start_job.pipeline_mode` (`light` | `balanced` | `full`, default `balanced`)
   - `gorchera_start_job.ambition_level`
   - `gorchera_start_job.role_overrides`
+  - `gorchera_start_job.prompt_overrides` (per-role prepend; workspace file overrides also supported via `.gorchera/prompts/{role}.md`)
   - `gorchera_start_chain` per-goal `ambition_level`
   - `gorchera_start_chain` per-goal `role_overrides`
   - `gorchera_resume.extra_steps` with MCP-side bounds (`1..20`)

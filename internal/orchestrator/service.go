@@ -59,10 +59,11 @@ type CreateJobInput struct {
 	RoleOverrides    map[string]domain.RoleOverride
 	MaxSteps         int
 	PipelineMode     string
-	StrictnessLevel  string   // strict | normal | lenient; empty defaults to "normal"
-	AmbitionLevel    string   // low | medium | high; empty or unrecognized defaults to "medium"
-	ContextMode      string   // full | summary | minimal; empty defaults to "full"
-	PreBuildCommands []string // run before engine build/test (best-effort)
+	StrictnessLevel  string            // strict | normal | lenient; empty defaults to "normal"
+	AmbitionLevel    string            // low | medium | high; empty or unrecognized defaults to "medium"
+	ContextMode      string            // full | summary | minimal; empty defaults to "full"
+	PreBuildCommands []string          // run before engine build/test (best-effort)
+	PromptOverrides  map[string]string // per-role prompt fragments prepended at call time
 	ChainID          string
 	ChainGoalIndex   int
 }
@@ -436,6 +437,7 @@ func (s *Service) prepareJob(input CreateJobInput) (*domain.Job, error) {
 		RoleProfiles:          roleProfiles,
 		RoleOverrides:         canonicalizeRoleOverrides(input.RoleOverrides),
 		PreBuildCommands:      input.PreBuildCommands,
+		PromptOverrides:       canonicalizePromptOverrides(input.PromptOverrides),
 		ChainID:               strings.TrimSpace(input.ChainID),
 		ChainGoalIndex:        input.ChainGoalIndex,
 		Status:                domain.JobStatusStarting,
@@ -477,6 +479,26 @@ func canonicalizeRoleOverrides(overrides map[string]domain.RoleOverride) map[str
 		}
 	}
 	return canonical
+}
+
+// canonicalizePromptOverrides normalizes keys to lowercase and drops entries
+// where the value is blank, returning nil when the result is empty.
+func canonicalizePromptOverrides(overrides map[string]string) map[string]string {
+	if len(overrides) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(overrides))
+	for k, v := range overrides {
+		key := strings.ToLower(strings.TrimSpace(k))
+		val := strings.TrimSpace(v)
+		if key != "" && val != "" {
+			out[key] = val
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (s *Service) applyResumeExtraSteps(ctx context.Context, job *domain.Job, extraSteps int) error {

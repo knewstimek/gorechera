@@ -3,6 +3,7 @@ package provider
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -205,7 +206,7 @@ func buildPlannerPrompt(job domain.Job) string {
 		}
 	}
 
-	return strings.TrimSpace(fmt.Sprintf(`
+	base := strings.TrimSpace(fmt.Sprintf(`
 TASK: You are a director planning component operating under an orchestrator supervisor. The supervisor manages the overall workflow, and you define the execution plan, sprint contract, and verification expectations that the director dispatch loop will enforce. You do not perform implementation yourself.
 The job data below is complete. Plan it now -- do not ask for more input.
 Output only a JSON object matching the schema. No conversation, no preamble.
@@ -243,6 +244,7 @@ Output requirements (all fields required in JSON):
 - recommended_max_steps: recommend the number of execution steps needed for this goal (minimum 1). Simpler goals with stronger models need fewer steps (e.g. 3-5); complex goals or weaker models may need more (e.g. 6-10).
 - verification_contract: object with version=1, goal=what to verify, required_artifacts=files that must exist after execution
 `, job.Goal, string(payload), chainSection, roleProfilesSection.String()))
+	return applyPromptOverrides(base, "director", job.WorkspaceDir, job.PromptOverrides)
 }
 
 func ambitionInstruction(level string) string {
@@ -295,7 +297,7 @@ func buildEvaluatorPrompt(job domain.Job) string {
 		schemaRetrySection = fmt.Sprintf("\nCORRECTION REQUIRED: Your previous response failed schema validation: %s\nRespond with valid JSON matching the required schema.\n", job.SchemaRetryHint)
 	}
 
-	return strings.TrimSpace(fmt.Sprintf(`
+	base := strings.TrimSpace(fmt.Sprintf(`
 TASK: You are an evaluator component operating under an orchestrator supervisor. The supervisor monitors completion outcomes, and the director plus workers provide the execution evidence you must assess. You verify results against the verification contract and report pass/fail/blocked decisions without performing implementation yourself.
 The job data below is complete. Evaluate it now -- do not ask for more input.
 Output only a JSON object matching the schema. No conversation, no preamble.
@@ -323,6 +325,7 @@ Current job state:
 Verification contract:
 %s
 `, ambitionEvaluationGuidance(job.AmbitionLevel), job.Goal, rubricSection, schemaRetrySection, buildCompactEvaluatorPayload(job), contractPayload))
+	return applyPromptOverrides(base, "evaluator", job.WorkspaceDir, job.PromptOverrides)
 }
 
 func buildLeaderPrompt(job domain.Job) string {
@@ -373,7 +376,7 @@ func buildLeaderPrompt(job domain.Job) string {
 			`- Strict mode is active. Do not choose complete until every required director stage has succeeded and the evaluator gate can pass without inference.`,
 		)
 	}
-	return strings.TrimSpace(fmt.Sprintf(`
+	base := strings.TrimSpace(fmt.Sprintf(`
 TASK: You are a director dispatch component operating under an orchestrator supervisor. The supervisor agent monitors your decisions via MCP tools and may inject [SUPERVISOR] directives as a separate supervisor directive. You coordinate executor and reviewer workers, rely on engine-managed build/test verification, and do not perform implementation yourself.
 The job data below is complete. Decide and output the next action now -- do not ask for input.
 Output only a JSON object matching the schema. No conversation, no preamble.
@@ -418,6 +421,9 @@ If the supervisor directive section is present, follow it with highest priority.
 Supervisor directives override previous plans.
 
 `, job.Goal, pipelineMode, strings.Join(completionRules, "\n"), invariantsSection, supervisorSection, schemaRetrySection, payload, contractPayload))
+	// Director role: the dispatch loop (leader) also uses the "director" role key
+	// so that a single workspace file covers both planner and dispatch phases.
+	return applyPromptOverrides(base, "director", job.WorkspaceDir, job.PromptOverrides)
 }
 
 // autoContextMode selects a context mode based on step count thresholds.
@@ -829,7 +835,7 @@ func buildWorkerPrompt(job domain.Job, task domain.LeaderOutput) string {
 		if strings.EqualFold(strings.TrimSpace(task.TaskType), "audit") {
 			reviewerLabel = "audit"
 		}
-		return strings.TrimSpace(fmt.Sprintf(`
+		reviewerBase := strings.TrimSpace(fmt.Sprintf(`
 TASK: You are a reviewer component assigned by the director. You are not the primary implementer for this step. Your job is to challenge the proposed change, look for counterexamples, and surface concrete risks before the job is allowed to complete.
 The assigned %s task below is complete and ready to execute. Do it now -- do not ask for input.
 Output only a JSON object matching the schema. No conversation, no preamble.
@@ -868,8 +874,9 @@ Job state:
 Verification contract:
 %s
 `, reviewerLabel, schemaRetrySection, job.Goal, taskContext.Objective, taskContext.Why, invariantsSection, taskContext.ScopeBoundary, reviewerLabel, string(taskPayload), buildCompactReviewerPayload(job, task), contractPayload))
+		return applyPromptOverrides(reviewerBase, "reviewer", job.WorkspaceDir, job.PromptOverrides)
 	}
-	return strings.TrimSpace(fmt.Sprintf(`
+	executorBase := strings.TrimSpace(fmt.Sprintf(`
 TASK: You are an executor worker assigned by the director. You perform the task described below. Report results accurately including files changed, commands run, and any errors encountered.
 The assigned task below is complete and ready to execute. Do it now -- do not ask for input.
 Output only a JSON object matching the schema. No conversation, no preamble.
@@ -905,6 +912,7 @@ File management rules:
 Job state:
 %s
 `, schemaRetrySection, job.Goal, taskContext.Objective, taskContext.Why, invariantsSection, taskContext.ScopeBoundary, ambitionInstruction(job.AmbitionLevel), string(taskPayload), buildCompactExecutorPayload(job, task)))
+	return applyPromptOverrides(executorBase, "executor", job.WorkspaceDir, job.PromptOverrides)
 }
 
 func profilePrompt(role domain.RoleName, job domain.Job) string {
@@ -936,4 +944,72 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// loadPromptOverride reads .gorchera/prompts/<role>.md from workspaceDir.
+// Returns (content, isReplace, error).
+// isReplace is true when the first line of the file is exactly "# REPLACE"
+// (the marker line itself is stripped from content).
+// If the file does not exist or workspaceDir is empty, returns ("", false, nil).
+// Read errors are treated as "no override" (logged by caller if needed).
+func loadPromptOverride(workspaceDir, role string) (string, bool, error) {
+	if strings.TrimSpace(workspaceDir) == "" {
+		return "", false, nil
+	}
+	path := filepath.Join(workspaceDir, ".gorchera", "prompts", role+".md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, nil
+		}
+		// Unexpected error -- surface it so the caller can log it.
+		return "", false, err
+	}
+	content := string(data)
+	firstLine, rest, _ := strings.Cut(content, "\n")
+	if strings.TrimSpace(firstLine) == "# REPLACE" {
+		// Strip the marker line; trim leading newline left by Cut.
+		return strings.TrimLeft(rest, "\n"), true, nil
+	}
+	return content, false, nil
+}
+
+// applyPromptOverrides applies workspace-file and job-parameter overrides to
+// a base prompt string and returns the final prompt.
+//
+// Priority (highest to lowest):
+//   1. jobOverrides[role] -- always prepended on top of whatever base is used
+//   2. workspace file    -- may replace or prepend onto the hardcoded base
+//   3. base             -- the hardcoded prompt from the build* functions
+//
+// The "replace" mode from workspace files replaces the hardcoded base, but job
+// overrides are still prepended on top of the replacement.  Job overrides never
+// support replace (too dangerous from a remote call).
+func applyPromptOverrides(base, role, workspaceDir string, jobOverrides map[string]string) string {
+	// Step 1: apply workspace file override.
+	wsContent, isReplace, err := loadPromptOverride(workspaceDir, role)
+	if err != nil {
+		// Log but continue -- do not fail the job over a missing or unreadable file.
+		log.Printf("[gorchera] prompt override load error for role %s: %v (using base prompt)", role, err)
+	}
+
+	result := base
+	if wsContent != "" {
+		if isReplace {
+			// Workspace file replaces the hardcoded base entirely.
+			result = strings.TrimSpace(wsContent)
+		} else {
+			// Workspace file is prepended before the base prompt.
+			result = strings.TrimSpace(wsContent) + "\n\n" + base
+		}
+	}
+
+	// Step 2: prepend job-level override on top of whatever base we settled on.
+	if jobOverrides != nil {
+		if fragment, ok := jobOverrides[role]; ok && strings.TrimSpace(fragment) != "" {
+			result = strings.TrimSpace(fragment) + "\n\n" + result
+		}
+	}
+
+	return result
 }
