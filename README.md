@@ -142,6 +142,37 @@ Strictness applies to any domain -- novel writing, reverse engineering, data pip
 
 **Budget tip**: if you can only afford one strong model, put it on the **evaluator**. The evaluator is the final gate -- a weak evaluator passes flawed code that no one else catches. A weak executor can be compensated by fix loops, but a weak evaluator cannot be compensated by anything.
 
+## Quick Reference for Other Projects
+
+Copy this into your project's CLAUDE.md or pass it to your supervisor agent when using Gorchera via MCP:
+
+```
+## Gorchera Orchestrator
+
+3-agent pipeline: director (plans) -> executor (implements) -> evaluator (verifies).
+Engine runs build/test automatically after each executor step.
+
+### Recommended Settings
+- Production quality: pipeline_mode=full, strictness_level=strict, ambition_level=extreme
+- Budget quality: pipeline_mode=balanced, strictness_level=normal, ambition_level=high
+- Fast iteration: pipeline_mode=light, strictness_level=lenient, ambition_level=low
+
+### Model Priority
+Evaluator > Director > Executor. Put strongest model on evaluator (final gate).
+Example: executor=gpt-5.3-codex-spark, evaluator=claude-sonnet-4-6
+
+### Key Parameters
+- goal: what to build (natural language)
+- provider: codex (GPT) or claude
+- role_overrides: per-role {provider, model} overrides
+- prompt_overrides: per-role prompt prepend (keys: director, executor, evaluator)
+- engine_build_cmd / engine_test_cmd: override build/test commands (default: go build/test)
+- Non-code projects: set engine commands to "true" to skip build/test
+
+### Presets
+See examples/role-profiles.sample.json for ready-made configurations.
+```
+
 ## Architecture
 
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for package structure, state machine, and core loop.
