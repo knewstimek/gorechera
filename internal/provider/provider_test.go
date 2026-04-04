@@ -1231,6 +1231,69 @@ func TestPlannerSchemaUsesStrictRequiredProperties(t *testing.T) {
 	}
 }
 
+// TestAllSchemasStrictRequiredRecursive verifies OpenAI strict mode compliance:
+// every object with "properties" must have a matching "required" array containing
+// all property keys, at every nesting level.
+func TestAllSchemasStrictRequiredRecursive(t *testing.T) {
+	t.Parallel()
+
+	schemas := map[string]string{
+		"planner":   plannerSchema(),
+		"leader":    leaderSchema(),
+		"evaluator": evaluatorSchema(),
+		"worker":    workerSchema(),
+	}
+	for name, raw := range schemas {
+		var node map[string]any
+		if err := json.Unmarshal([]byte(raw), &node); err != nil {
+			t.Fatalf("%s: invalid JSON: %v", name, err)
+		}
+		assertStrictRequired(t, name, node)
+	}
+}
+
+func assertStrictRequired(t *testing.T, path string, node map[string]any) {
+	t.Helper()
+	props, hasProps := node["properties"].(map[string]any)
+	if !hasProps {
+		// Check anyOf/items for nested objects
+		if anyOf, ok := node["anyOf"].([]any); ok {
+			for i, branch := range anyOf {
+				if obj, ok := branch.(map[string]any); ok {
+					assertStrictRequired(t, fmt.Sprintf("%s.anyOf[%d]", path, i), obj)
+				}
+			}
+		}
+		if items, ok := node["items"].(map[string]any); ok {
+			assertStrictRequired(t, path+".items", items)
+		}
+		return
+	}
+	// This object has properties -- it must have required containing all keys
+	reqRaw, hasReq := node["required"].([]any)
+	if !hasReq {
+		t.Errorf("%s: has properties but no required array", path)
+		return
+	}
+	reqSet := make(map[string]bool, len(reqRaw))
+	for _, r := range reqRaw {
+		if s, ok := r.(string); ok {
+			reqSet[s] = true
+		}
+	}
+	for key := range props {
+		if !reqSet[key] {
+			t.Errorf("%s: property %q missing from required array (OpenAI strict mode)", path, key)
+		}
+	}
+	// Recurse into each property
+	for key, val := range props {
+		if obj, ok := val.(map[string]any); ok {
+			assertStrictRequired(t, path+"."+key, obj)
+		}
+	}
+}
+
 func TestPlannerPromptIsUnchangedByAmbitionLevel(t *testing.T) {
 	t.Parallel()
 

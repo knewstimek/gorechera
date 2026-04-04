@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (post v2026.04.04)
+## v2026.04.04.1
 
 ### Breaking
 - **3-agent pipeline**: reviewer role removed. Evaluator now performs code review + gate. Pipeline is director -> executor -> evaluator. review/audit task types removed from leader schema.
@@ -15,6 +15,8 @@
 - **Evaluator fix loop**: evaluator "failed" now re-enters leader retry loop (was instant job termination). Leader receives evaluator findings in context to dispatch fix steps.
 - **Production presets**: examples/role-profiles.sample.json updated with production (strict+extreme), spark+claude-eval combo, and prompt_overrides examples.
 - prompt_overrides support in ChainGoal (was missing -- BUG-1 fix).
+- **Executor self-check**: engine_build_cmd/engine_test_cmd injected into executor prompt for pre-submission build/test verification. Reduces fix loop round-trips.
+- **Evaluator test correctness check**: all strictness levels now verify test expected values are correct, not just that tests pass.
 
 ### Fixed
 - Leader schema: system_action changed to anyOf [null, object] for OpenAI strict mode compatibility.
