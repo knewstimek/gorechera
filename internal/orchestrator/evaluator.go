@@ -16,6 +16,18 @@ func (s *Service) evaluateCompletion(ctx context.Context, job *domain.Job) (*dom
 		verificationPath = verificationContractPath(*job)
 	}
 	sprint := buildSprintContract(*job, buildPlanningArtifact(*job, nil))
+
+	// Run mechanical automated checks before calling the evaluator LLM.
+	// Results are stored on the job so that buildCompactEvaluatorPayload can
+	// include them in the evaluator prompt, providing deterministic evidence.
+	if job.VerificationContract != nil && len(job.VerificationContract.AutomatedChecks) > 0 {
+		job.PreCheckResults = runAutomatedChecks(
+			firstNonEmpty(job.WorkspaceDir, s.workspaceRoot),
+			job.VerificationContract.AutomatedChecks,
+			job.Steps,
+		)
+	}
+
 	providerReport, err := s.runEvaluatorPhase(ctx, job, verification, verificationPath)
 	if err != nil {
 		if isShutdownInterruption(ctx, err) {

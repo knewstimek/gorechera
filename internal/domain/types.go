@@ -347,6 +347,37 @@ type RubricAxis struct {
 	MinThreshold float64 `json:"min_threshold"`
 }
 
+// AutomatedCheck describes a mechanical check that the orchestrator runs
+// before calling the evaluator LLM. Mechanical checks reduce evaluator token
+// spend and provide deterministic evidence for the evaluator prompt.
+type AutomatedCheck struct {
+	// Type selects the check implementation:
+	//   "grep"          -- pattern must match at least one file
+	//   "file_exists"   -- path must exist in the workspace
+	//   "file_unchanged"-- path must NOT appear in any step's ChangedFiles
+	//   "no_new_deps"   -- go.mod must NOT appear in any step's ChangedFiles
+	Type        string `json:"type"`
+	Pattern     string `json:"pattern,omitempty"`     // regex pattern for grep checks
+	File        string `json:"file,omitempty"`        // glob pattern for grep target files
+	Path        string `json:"path,omitempty"`        // relative path for file_exists / file_unchanged
+	Ref         string `json:"ref,omitempty"`         // reserved for future engine-ref checks
+	Description string `json:"description"`
+}
+
+// AutomatedCheckResult records the outcome of a single AutomatedCheck run.
+type AutomatedCheckResult struct {
+	Description string `json:"description"`
+	Status      string `json:"status"` // passed, failed, skipped
+	Detail      string `json:"detail,omitempty"`
+}
+
+// ChangedFile represents a file change detected by workspace snapshot diff
+// or git diff --stat parsing after a worker step.
+type ChangedFile struct {
+	Path   string `json:"path"`
+	Action string `json:"action"` // created, modified, deleted
+}
+
 // RubricScore records the evaluator's score for a single rubric axis.
 type RubricScore struct {
 	Axis   string  `json:"axis"`
@@ -355,17 +386,18 @@ type RubricScore struct {
 }
 
 type VerificationContract struct {
-	Version           int          `json:"version"`
-	Goal              string       `json:"goal"`
-	Scope             []string     `json:"scope,omitempty"`
-	RequiredCommands  []string     `json:"required_commands,omitempty"`
-	RequiredArtifacts []string     `json:"required_artifacts,omitempty"`
-	RequiredChecks    []string     `json:"required_checks,omitempty"`
-	DisallowedActions []string     `json:"disallowed_actions,omitempty"`
-	MaxSeconds        int          `json:"max_seconds,omitempty"`
-	Notes             string       `json:"notes,omitempty"`
-	OwnerRole         RoleName     `json:"owner_role,omitempty"`
-	RubricAxes        []RubricAxis `json:"rubric_axes,omitempty"`
+	Version           int               `json:"version"`
+	Goal              string            `json:"goal"`
+	Scope             []string          `json:"scope,omitempty"`
+	RequiredCommands  []string          `json:"required_commands,omitempty"`
+	RequiredArtifacts []string          `json:"required_artifacts,omitempty"`
+	RequiredChecks    []string          `json:"required_checks,omitempty"`
+	DisallowedActions []string          `json:"disallowed_actions,omitempty"`
+	MaxSeconds        int               `json:"max_seconds,omitempty"`
+	Notes             string            `json:"notes,omitempty"`
+	OwnerRole         RoleName          `json:"owner_role,omitempty"`
+	RubricAxes        []RubricAxis      `json:"rubric_axes,omitempty"`
+	AutomatedChecks   []AutomatedCheck  `json:"automated_checks,omitempty"`
 }
 
 type VerificationReport struct {
@@ -446,6 +478,7 @@ type Step struct {
 	Summary          string            `json:"summary,omitempty"`
 	DiffSummary      string            `json:"diff_summary,omitempty"`
 	Artifacts        []string          `json:"artifacts,omitempty"`
+	ChangedFiles     []ChangedFile     `json:"changed_files,omitempty"`
 	BlockedReason    string            `json:"blocked_reason,omitempty"`
 	ErrorReason      string            `json:"error_reason,omitempty"`
 	StructuredReason *StructuredReason `json:"structured_reason,omitempty"`
@@ -514,6 +547,11 @@ type Job struct {
 	// Set at job creation time and never mutated during execution.
 	PromptOverrides         map[string]string       `json:"prompt_overrides,omitempty"`
 	SchemaRetryHint         string                  `json:"schema_retry_hint,omitempty"`
+	// PreCheckResults holds automated check results computed just before the
+	// evaluator LLM call. The field is intentionally excluded from JSON
+	// serialization (json:"-") because it is a transient computation artifact
+	// that does not need to survive a restart.
+	PreCheckResults         []AutomatedCheckResult  `json:"-"`
 	RunOwnerID              string                  `json:"run_owner_id,omitempty"`
 	RunHeartbeatAt          time.Time               `json:"run_heartbeat_at,omitempty"`
 	TokenUsage              TokenUsage              `json:"token_usage"`
@@ -578,6 +616,10 @@ func CloneJob(src *Job) *Job {
 		if len(src.VerificationContract.RubricAxes) > 0 {
 			vc.RubricAxes = make([]RubricAxis, len(src.VerificationContract.RubricAxes))
 			copy(vc.RubricAxes, src.VerificationContract.RubricAxes)
+		}
+		if len(src.VerificationContract.AutomatedChecks) > 0 {
+			vc.AutomatedChecks = make([]AutomatedCheck, len(src.VerificationContract.AutomatedChecks))
+			copy(vc.AutomatedChecks, src.VerificationContract.AutomatedChecks)
 		}
 		dst.VerificationContract = &vc
 	}

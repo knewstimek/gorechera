@@ -95,7 +95,23 @@ func plannerSchema() string {
         "disallowed_actions": {"type": "array", "items": {"type": "string"}},
         "max_seconds": {"type": "integer"},
         "notes": {"type": "string"},
-        "owner_role": {"type": "string"}
+        "owner_role": {"type": "string"},
+        "automated_checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {"type": "string", "enum": ["grep", "file_exists", "file_unchanged", "no_new_deps"]},
+              "pattern": {"type": "string"},
+              "file": {"type": "string"},
+              "path": {"type": "string"},
+              "ref": {"type": "string"},
+              "description": {"type": "string"}
+            },
+            "required": ["type", "description"],
+            "additionalProperties": false
+          }
+        }
       },
       "required": ["version", "goal", "scope", "required_commands", "required_artifacts", "required_checks", "disallowed_actions", "max_seconds", "notes", "owner_role"],
       "additionalProperties": false
@@ -248,6 +264,13 @@ Output requirements (all fields required in JSON):
 - recommended_strictness: recommend "strict", "normal", or "lenient" based on goal complexity and model capabilities. Stronger models (opus) can handle stricter evaluation and fewer steps; weaker models (sonnet, haiku) benefit from normal strictness and more steps. Use "strict" only for goals requiring tight review coverage with capable models; use "normal" for most goals; use "lenient" for simple or exploratory tasks.
 - recommended_max_steps: recommend the number of execution steps needed for this goal (minimum 1). Simpler goals with stronger models need fewer steps (e.g. 3-5); complex goals or weaker models may need more (e.g. 6-10).
 - verification_contract: object with version=1, goal=what to verify, required_artifacts=files that must exist after execution
+
+When writing the verification_contract, include automated_checks for any requirement that can be verified mechanically:
+- type "grep": verify a pattern exists in source files. Set pattern (regex) and file (glob like "*.go").
+- type "file_exists": verify a file was created. Set path (relative to workspace).
+- type "file_unchanged": verify a file was NOT modified. Set path.
+- type "no_new_deps": verify no new external dependencies were added to go.mod.
+Keep required_checks only for requirements that need human/AI judgment (code quality, correctness, edge cases).
 `, job.Goal, string(payload), chainSection, roleProfilesSection.String()))
 	return applyPromptOverrides(base, "director", job.WorkspaceDir, job.PromptOverrides)
 }
@@ -719,52 +742,62 @@ func buildCompactReviewerPayload(job domain.Job, task domain.LeaderOutput) strin
 }
 
 // buildCompactEvaluatorPayload returns a compact job state for the evaluator.
-// Includes goal, status, role profiles, and step summaries. Omits events,
-// planning artifacts, and raw step task texts to reduce prompt size.
+// Includes goal, status, role profiles, step summaries, automated check
+// results, and per-step changed file lists. Omits events, planning artifacts,
+// and raw step task texts to reduce prompt size.
 // Role profiles are included so the evaluator knows which models ran each role.
 func buildCompactEvaluatorPayload(job domain.Job) string {
 	type stepEvidence struct {
-		Index       int      `json:"index"`
-		TaskType    string   `json:"task_type"`
-		Status      string   `json:"status"`
-		Summary     string   `json:"summary,omitempty"`
-		DiffSummary string   `json:"diff_summary,omitempty"`
-		ErrorReason string   `json:"error_reason,omitempty"`
-		Artifacts   []string `json:"artifacts,omitempty"`
+		Index        int                        `json:"index"`
+		TaskType     string                     `json:"task_type"`
+		Status       string                     `json:"status"`
+		Summary      string                     `json:"summary,omitempty"`
+		DiffSummary  string                     `json:"diff_summary,omitempty"`
+		ErrorReason  string                     `json:"error_reason,omitempty"`
+		Artifacts    []string                   `json:"artifacts,omitempty"`
+		ChangedFiles []domain.ChangedFile       `json:"changed_files,omitempty"`
 	}
 	type compactPayload struct {
-		JobID        string              `json:"job_id,omitempty"`
-		Goal         string              `json:"goal"`
-		Status       string              `json:"status"`
-		CurrentStep  int                 `json:"current_step"`
-		Summary      string              `json:"summary,omitempty"`
-		RoleProfiles domain.RoleProfiles `json:"role_profiles"`
-		Steps        []stepEvidence      `json:"steps"`
+		JobID                string                       `json:"job_id,omitempty"`
+		Goal                 string                       `json:"goal"`
+		Status               string                       `json:"status"`
+		CurrentStep          int                          `json:"current_step"`
+		Summary              string                       `json:"summary,omitempty"`
+		RoleProfiles         domain.RoleProfiles          `json:"role_profiles"`
+		Steps                []stepEvidence               `json:"steps"`
+		AutomatedCheckResults []domain.AutomatedCheckResult `json:"automated_check_results,omitempty"`
+		ChangedFiles         []domain.ChangedFile          `json:"changed_files,omitempty"`
 	}
 	steps := make([]stepEvidence, 0, len(job.Steps))
+	// Accumulate all changed files across steps for the top-level summary.
+	var allChangedFiles []domain.ChangedFile
 	for _, s := range job.Steps {
 		summary := s.Summary
 		if len([]rune(summary)) > 500 {
 			summary = string([]rune(summary)[:500]) + "..."
 		}
 		steps = append(steps, stepEvidence{
-			Index:       s.Index,
-			TaskType:    s.TaskType,
-			Status:      string(s.Status),
-			Summary:     summary,
-			DiffSummary: s.DiffSummary,
-			ErrorReason: s.ErrorReason,
-			Artifacts:   s.Artifacts,
+			Index:        s.Index,
+			TaskType:     s.TaskType,
+			Status:       string(s.Status),
+			Summary:      summary,
+			DiffSummary:  s.DiffSummary,
+			ErrorReason:  s.ErrorReason,
+			Artifacts:    s.Artifacts,
+			ChangedFiles: s.ChangedFiles,
 		})
+		allChangedFiles = append(allChangedFiles, s.ChangedFiles...)
 	}
 	out := compactPayload{
-		JobID:        job.ID,
-		Goal:         job.Goal,
-		Status:       string(job.Status),
-		CurrentStep:  job.CurrentStep,
-		Summary:      job.Summary,
-		RoleProfiles: job.RoleProfiles,
-		Steps:        steps,
+		JobID:                 job.ID,
+		Goal:                  job.Goal,
+		Status:                string(job.Status),
+		CurrentStep:           job.CurrentStep,
+		Summary:               job.Summary,
+		RoleProfiles:          job.RoleProfiles,
+		Steps:                 steps,
+		AutomatedCheckResults: job.PreCheckResults,
+		ChangedFiles:          allChangedFiles,
 	}
 	raw, _ := json.MarshalIndent(out, "", "  ")
 	return string(raw)

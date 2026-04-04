@@ -1427,6 +1427,10 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 		return s.runParallelWorkerPlans(ctx, job, plans)
 	}
 
+	// Snapshot workspace before worker execution so we can detect changed files
+	// even when the workspace is not a git repository.
+	preSnapshot, _ := snapshotWorkspace(firstNonEmpty(job.WorkspaceDir, s.workspaceRoot))
+
 	task := decorateTaskForVerification(*job, plans[0].Task)
 	job.Status = domain.JobStatusWaitingWorker
 	job.CurrentStep++
@@ -1542,7 +1546,9 @@ func (s *Service) runWorkerStep(ctx context.Context, job *domain.Job, leader dom
 
 	switch worker.Status {
 	case "success":
-		last.DiffSummary = collectWorkspaceDiffSummary(ctx, firstNonEmpty(job.WorkspaceDir, s.workspaceRoot))
+		workDir := firstNonEmpty(job.WorkspaceDir, s.workspaceRoot)
+		last.DiffSummary = collectWorkspaceDiffSummary(ctx, workDir)
+		last.ChangedFiles = detectChangedFiles(ctx, workDir, preSnapshot)
 		last.Status = domain.StepStatusSucceeded
 		job.Status = domain.JobStatusRunning
 		job.FailureReason = ""
