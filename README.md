@@ -140,6 +140,8 @@ Strictness applies to any domain -- novel writing, reverse engineering, data pip
 
 `examples/role-profiles.sample.json` lists ready-made presets. The **production** preset uses `pipeline_mode=full`, `strictness_level=strict`, `ambition_level=extreme` with GPT director and Claude Sonnet executor/evaluator -- suitable for critical or customer-facing changes. The **production-spark-claude-eval** variant uses Spark models for speed while keeping Claude Sonnet as the evaluator for accurate judgment.
 
+**Budget tip**: if you can only afford one strong model, put it on the **evaluator**. The evaluator is the final gate -- a weak evaluator passes flawed code that no one else catches. A weak executor can be compensated by fix loops, but a weak evaluator cannot be compensated by anything.
+
 ## Architecture
 
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for package structure, state machine, and core loop.
