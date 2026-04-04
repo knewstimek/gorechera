@@ -266,7 +266,7 @@ func TestToolStartChainReturnsChainIDAndStatus(t *testing.T) {
 		t.Fatalf("expected second chain goal default ambition level %q, got %q", domain.AmbitionLevelMedium, chain.Goals[1].AmbitionLevel)
 	}
 
-	jobResult, err := server.toolStatus(context.Background(), map[string]any{"job_id": chain.Goals[0].JobID})
+	jobResult, err := server.toolStatus(context.Background(), map[string]any{"job_id": chain.Goals[0].JobID, "compact": false})
 	if err != nil {
 		t.Fatalf("toolStatus returned error: %v", err)
 	}

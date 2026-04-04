@@ -182,6 +182,7 @@ func runBasic(cfg Config) (*Summary, error) {
 			"job_id":       started.ID,
 			"wait":         true,
 			"wait_timeout": int(cfg.WaitTimeout / time.Second),
+			"compact":      false,
 		},
 	}, cfg.WaitTimeout+5*time.Second)
 	if err != nil {
@@ -254,6 +255,7 @@ func runIsolated(cfg Config) (*Summary, error) {
 			"job_id":       started.ID,
 			"wait":         true,
 			"wait_timeout": int(cfg.WaitTimeout / time.Second),
+			"compact":      false,
 		},
 	}, cfg.WaitTimeout+5*time.Second)
 	if err != nil {
@@ -325,6 +327,7 @@ func runRecovery(cfg Config) (*Summary, error) {
 				"job_id":       seededJob.ID,
 				"wait":         true,
 				"wait_timeout": int(cfg.WaitTimeout / time.Second),
+				"compact":      false,
 			},
 		}, cfg.WaitTimeout+5*time.Second)
 		if err != nil {
@@ -371,8 +374,9 @@ func runInterrupt(cfg Config) (*Summary, error) {
 		statusMsg, err := c.call(callID, "tools/call", toolCallParams{
 			Name: "gorchera_status",
 			Arguments: map[string]any{
-				"job_id": seededJob.ID,
-				"wait":   false,
+				"job_id":  seededJob.ID,
+				"wait":    false,
+				"compact": false,
 			},
 		}, cfg.WaitTimeout)
 		if err != nil {

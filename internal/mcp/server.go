@@ -562,6 +562,7 @@ func toolList() []toolDef {
 					"job_id":       {Type: "string", Description: "Job ID"},
 					"wait":         {Type: "boolean", Description: "When true, wait for the job to reach a terminal state before returning", Default: false},
 					"wait_timeout": {Type: "integer", Description: "Optional wait timeout in seconds when wait=true. Omit to use 30 seconds. Set to 0 to preserve the original 5-minute timeout.", Default: 30},
+					"compact":      {Type: "boolean", Description: "When true (default), return a compact status with heavy fields omitted (task_text, verification_contract, diff_summary, changed_files, etc). Set false for full job data.", Default: true},
 				},
 				Required: []string{"job_id"},
 			},
@@ -1024,6 +1025,10 @@ func (s *Server) toolStatus(ctx context.Context, args map[string]any) (toolResul
 	if err != nil {
 		return toolResult{}, err
 	}
+	compact := boolArgDefault(args, "compact", true)
+	if compact {
+		return jsonResult(compactJobStatus(job))
+	}
 	return jsonResult(job)
 }
 
@@ -1395,6 +1400,81 @@ func errorResp(id any, code int, message string) *jsonRPCResponse {
 
 func textResult(text string) toolResult {
 	return toolResult{Content: []contentItem{{Type: "text", Text: text}}}
+}
+
+// compactJobStatus returns a lightweight view of the job for polling.
+// Omits heavy fields: goal, task_text, verification_contract, diff_summary,
+// changed_files, constraints, done_criteria, role_profiles, role_overrides,
+// planning_artifacts, prompt_overrides. Events are capped to the last 10.
+func compactJobStatus(job *domain.Job) *compactJob {
+	steps := make([]compactStep, len(job.Steps))
+	for i, s := range job.Steps {
+		steps[i] = compactStep{
+			Index:     s.Index,
+			Target:    s.Target,
+			TaskType:  s.TaskType,
+			Status:    s.Status,
+			Summary:   s.Summary,
+			StartedAt: s.StartedAt,
+		}
+		if s.ErrorReason != "" {
+			steps[i].ErrorReason = s.ErrorReason
+		}
+	}
+	events := job.Events
+	const maxEvents = 10
+	if len(events) > maxEvents {
+		events = events[len(events)-maxEvents:]
+	}
+	return &compactJob{
+		ID:                   job.ID,
+		Status:               job.Status,
+		Provider:             job.Provider,
+		CurrentStep:          job.CurrentStep,
+		MaxSteps:             job.MaxSteps,
+		Summary:              job.Summary,
+		BlockedReason:        job.BlockedReason,
+		FailureReason:        job.FailureReason,
+		LeaderContextSummary: job.LeaderContextSummary,
+		PendingApproval:      job.PendingApproval,
+		ChainID:              job.ChainID,
+		ChainGoalIndex:       job.ChainGoalIndex,
+		TokenUsage:           job.TokenUsage,
+		Steps:                steps,
+		Events:               events,
+		CreatedAt:            job.CreatedAt,
+		UpdatedAt:            job.UpdatedAt,
+	}
+}
+
+type compactJob struct {
+	ID                   string                  `json:"id"`
+	Status               domain.JobStatus        `json:"status"`
+	Provider             domain.ProviderName     `json:"provider"`
+	CurrentStep          int                     `json:"current_step"`
+	MaxSteps             int                     `json:"max_steps"`
+	Summary              string                  `json:"summary,omitempty"`
+	BlockedReason        string                  `json:"blocked_reason,omitempty"`
+	FailureReason        string                  `json:"failure_reason,omitempty"`
+	LeaderContextSummary string                  `json:"leader_context_summary,omitempty"`
+	PendingApproval      *domain.PendingApproval `json:"pending_approval,omitempty"`
+	ChainID              string                  `json:"chain_id,omitempty"`
+	ChainGoalIndex       int                     `json:"chain_goal_index,omitempty"`
+	TokenUsage           domain.TokenUsage       `json:"token_usage"`
+	Steps                []compactStep           `json:"steps,omitempty"`
+	Events               []domain.Event          `json:"events,omitempty"`
+	CreatedAt            time.Time               `json:"created_at"`
+	UpdatedAt            time.Time               `json:"updated_at"`
+}
+
+type compactStep struct {
+	Index       int               `json:"index"`
+	Target      string            `json:"target"`
+	TaskType    string            `json:"task_type"`
+	Status      domain.StepStatus `json:"status"`
+	Summary     string            `json:"summary,omitempty"`
+	ErrorReason string            `json:"error_reason,omitempty"`
+	StartedAt   time.Time         `json:"started_at"`
 }
 
 func jsonResult(v any) (toolResult, error) {
