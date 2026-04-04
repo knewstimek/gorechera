@@ -8,6 +8,9 @@
 - **Evaluator gate bypass (CRITICAL)**: `mergeEvaluatorReport` had `if rulePassed { providerPassed = true }` which silently discarded the LLM evaluator's judgment whenever build/test/steps passed mechanically. The evaluator could find concrete DEFECT findings, return `passed: false`, and the merge logic would override it to `true`. This meant the evaluator retry loop -- the central quality mechanism -- was effectively dead code. Removed the override; both rule-based and provider verdicts must now independently agree.
 - **Automated checks not enforced (CRITICAL)**: `PreCheckResults` (grep/file_exists/file_unchanged/no_new_deps) were only informational context for the LLM evaluator, not a mechanical gate. A failed grep check could not block a job regardless of the result. Now any failed automated check mechanically blocks the report as a final demote-only gate.
 
+### Added
+- **Compact status mode**: `gorchera_status` now defaults to `compact=true`, returning a lightweight view that omits heavy fields (goal, task_text, verification_contract, diff_summary, changed_files, constraints, role_profiles, role_overrides, planning_artifacts, prompt_overrides). Steps reduced to index/target/task_type/status/summary/error_reason. Events capped to last 10. Reduces polling token cost from ~10-15k to ~1-2k per call. Use `compact=false` for full job data.
+
 ## v2026.04.04.1
 
 ### Breaking
