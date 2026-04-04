@@ -224,9 +224,6 @@ func mergeEvaluatorReport(job domain.Job, verification VerificationContract, spr
 	providerMissing := filterProviderMissingStepTypes(providerReport.MissingStepTypes, sprint.RequiredStepTypes)
 	ignoreProviderMissing := providerBlockedOnlyOnOptionalCoverage(providerReport, providerMissing)
 	providerPassed := providerReport.Passed || ignoreProviderMissing
-	if rulePassed {
-		providerPassed = true
-	}
 
 	report := &domain.EvaluatorReport{
 		Status:           providerReport.Status,
@@ -307,7 +304,33 @@ func mergeEvaluatorReport(job domain.Job, verification VerificationContract, spr
 		}
 	}
 
+	// Enforce automated check failures as a mechanical gate.
+	// automated_checks results were previously only informational context for
+	// the LLM evaluator; a failed grep/file_exists check could be ignored if
+	// the provider returned passed=true. Now any failed check blocks the report.
+	if failedChecks := failedAutomatedCheckNames(job.PreCheckResults); len(failedChecks) > 0 {
+		report.Passed = false
+		report.Status = "failed"
+		report.Reason = fmt.Sprintf("automated checks failed: %s", strings.Join(failedChecks, ", "))
+	}
+
 	return report
+}
+
+// failedAutomatedCheckNames returns descriptions of automated checks that
+// reported a "failed" status. Returns nil when all checks passed or skipped.
+func failedAutomatedCheckNames(results []domain.AutomatedCheckResult) []string {
+	var failed []string
+	for _, r := range results {
+		if r.Status == "failed" {
+			desc := r.Description
+			if desc == "" {
+				desc = r.Detail
+			}
+			failed = append(failed, desc)
+		}
+	}
+	return failed
 }
 
 func validateEvaluatorReport(report domain.EvaluatorReport, job domain.Job) error {

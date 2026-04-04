@@ -1,5 +1,11 @@
 # Changelog
 
+## v2026.04.04.2
+
+### Fixed
+- **Evaluator gate bypass (structural)**: `mergeEvaluatorReport` had `if rulePassed { providerPassed = true }` which overrode the LLM evaluator's judgment when mechanical checks (build/test/steps) passed. Evaluator could find DEFECT but job still passed. Removed the override -- both rule-based and provider verdicts must independently agree.
+- **Automated checks not enforced**: `PreCheckResults` (grep/file_exists/file_unchanged/no_new_deps) were only informational context for the LLM evaluator, not a mechanical gate. A failed grep check could be ignored if the provider returned passed=true. Now any failed automated check mechanically blocks the report regardless of provider/rule verdicts.
+
 ## v2026.04.04.1
 
 ### Breaking
