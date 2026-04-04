@@ -155,7 +155,7 @@ Engine runs build/test automatically after each executor step.
 ### Recommended Settings
 - Production quality: pipeline_mode=full, strictness_level=strict, ambition_level=extreme
 - Budget quality: pipeline_mode=balanced, strictness_level=normal, ambition_level=high
-- Fast iteration: pipeline_mode=light, strictness_level=lenient, ambition_level=low
+- Fast iteration: use a sub-agent directly -- Gorchera overhead is not justified for simple tasks
 
 ### Model Priority
 Evaluator > Director > Executor. Put strongest model on evaluator (final gate).
