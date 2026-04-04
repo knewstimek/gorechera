@@ -113,7 +113,7 @@ func plannerSchema() string {
           }
         }
       },
-      "required": ["version", "goal", "scope", "required_commands", "required_artifacts", "required_checks", "disallowed_actions", "max_seconds", "notes", "owner_role"],
+      "required": ["version", "goal", "scope", "required_commands", "required_artifacts", "required_checks", "disallowed_actions", "max_seconds", "notes", "owner_role", "automated_checks"],
       "additionalProperties": false
     }
   },
