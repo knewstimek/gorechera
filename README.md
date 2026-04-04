@@ -70,6 +70,76 @@ Light mode with cross-provider (director=GPT, executor=Claude Sonnet) costs ~$0.
 | `gorchera_skip_chain_goal` | Skip current chain goal |
 | `gorchera_diff` | Inspect workspace diff (pathspec-injection-safe) |
 
+## Prompt Overrides
+
+Per-role prompt customization at two levels:
+
+- **Job parameter**: pass `prompt_overrides` to `gorchera_start_job` with keys `director`, `executor`, `evaluator`. The text is prepended to the default role prompt.
+- **Workspace file**: place `.gorchera/prompts/{role}.md` in the workspace. If the file starts with `# REPLACE`, the entire default prompt is replaced; otherwise it is prepended.
+
+```json
+{
+  "prompt_overrides": {
+    "executor": "Use idiomatic Rust. Avoid unsafe blocks.",
+    "evaluator": "Focus on memory safety and API ergonomics."
+  }
+}
+```
+
+## Executor Self-Check
+
+Before submitting results, the executor runs `engine_build_cmd` and `engine_test_cmd` from the prompt (e.g., `go build ./...` / `go test ./...`) and confirms success. The engine gate then re-runs the same commands independently -- the executor self-check does not replace the gate, it reduces wasted evaluator calls.
+
+## Automated Checks
+
+The director generates a `verification_contract.automated_checks` list in the plan. Before the evaluator is called, the engine runs each check mechanically:
+
+| Check type | Description |
+|------------|-------------|
+| `grep` | Pattern must (or must not) appear in target files |
+| `file_exists` | File path must exist in workspace |
+| `file_unchanged` | File must not have been modified |
+| `no_new_deps` | Dependency manifest must not add new packages |
+
+Check results are injected into the evaluator payload so the evaluator can reference them.
+
+## Workspace Change Detection
+
+After each worker (executor/reviewer) runs, Gorchera computes the set of changed files:
+
+- **Fast path**: `git diff --stat HEAD` between before/after snapshots
+- **Fallback**: SHA-256 hash comparison when no git repo is present
+
+The `changed_files` list is attached to the job artifact and used by automated checks.
+
+## Evaluator Strictness
+
+All strictness levels default to FAIL if requirements are not met.
+
+| Level | Behavior |
+|-------|----------|
+| `lenient` | Core files only; flags obvious defects |
+| `normal` | All changed files; domain standards apply |
+| `strict` | Adversarial reviewer; senior engineer bar; 3-input trace; test expectations validated |
+
+Strictness applies to any domain -- novel writing, reverse engineering, data pipelines, etc. The code-specific parts (build/test gates, fuzz/bench requirements) can be suppressed or replaced via `prompt_overrides.evaluator` when working in a non-code domain. For non-code projects, set `engine_build_cmd` and `engine_test_cmd` to empty strings to disable executor self-check and engine verification.
+
+## Ambition Levels
+
+| Level | Executor behavior |
+|-------|-------------------|
+| `low` | Minimal change to meet the goal |
+| `medium` | Clean implementation, basic tests |
+| `high` | Full tests, docs, error handling |
+| `extreme` | Production quality -- perf, edge cases, idiomatic style, security hardening |
+| `custom` | Controlled by `ambition_text` job parameter |
+
+`extreme` is appropriate for production-grade work. Use `strict` + `extreme` together for the highest quality bar.
+
+## Provider Presets
+
+`examples/role-profiles.sample.json` lists ready-made presets. The **production** preset uses `pipeline_mode=full`, `strictness_level=strict`, `ambition_level=extreme` with GPT director and Claude Sonnet executor/evaluator -- suitable for critical or customer-facing changes. The **production-spark-claude-eval** variant uses Spark models for speed while keeping Claude Sonnet as the evaluator for accurate judgment.
+
 ## Architecture
 
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for package structure, state machine, and core loop.
