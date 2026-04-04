@@ -7,6 +7,7 @@
 - **Runtime workspace switch**: `POST /admin/workspace {"workspace":"..."}` hot-swaps the serve process to a different workspace without restart. `GET /admin/workspace` returns the current workspace.
 - **Graceful shutdown**: `gorchera stop [-workspace DIR | -addr HOST:PORT]` sends a shutdown request to a running serve. Serve writes a PID file (`.gorchera/serve.pid`) on startup and cleans it up on exit. Signal handling (Ctrl+C) also triggers graceful shutdown.
 - **Root redirect**: `GET /` redirects to `/dashboard/` instead of returning 404.
+- **Dashboard embedded**: dashboard static files (index.html, app.js, style.css) are now embedded in the binary via `go:embed`. No `web/` directory needed next to the binary.
 
 ## v2026.04.04.2
 

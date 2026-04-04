@@ -15,6 +15,7 @@ import (
 
 	"gorchera/internal/domain"
 	"gorchera/internal/orchestrator"
+	webstatic "gorchera/web"
 )
 
 type Server struct {
@@ -38,9 +39,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/harness/", s.handleHarness)
 	mux.HandleFunc("/chains", s.handleChains)
 	mux.HandleFunc("/chains/", s.handleChain)
-	// Serve static dashboard files from the web/ directory.
-	fs := http.FileServer(http.Dir("web"))
-	mux.Handle("/dashboard/", http.StripPrefix("/dashboard/", fs))
+	// Serve static dashboard files from the embedded web/ assets.
+	mux.Handle("/dashboard/", http.StripPrefix("/dashboard/", http.FileServer(http.FS(webstatic.FS))))
 	// Wrap all routes with bearer token auth when GORCHERA_AUTH_TOKEN is set.
 	// If the env var is empty/unset, auth is skipped (development mode).
 	token := os.Getenv("GORCHERA_AUTH_TOKEN")
