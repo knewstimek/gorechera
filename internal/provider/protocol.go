@@ -108,7 +108,7 @@ func plannerSchema() string {
               "ref": {"type": "string"},
               "description": {"type": "string"}
             },
-            "required": ["type", "description"],
+            "required": ["type", "pattern", "file", "path", "ref", "description"],
             "additionalProperties": false
           }
         }
