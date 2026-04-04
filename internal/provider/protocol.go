@@ -365,12 +365,14 @@ EVALUATION PROCEDURE:
 6. Use status="blocked" only when the available evidence is genuinely insufficient or ambiguous even after reading the job state.
 7. Prefer concrete missing_step_types and evidence over vague reasons.
 
-VERIFICATION PROCEDURE:
-- Read the artifact files listed in the job state to inspect detailed engine results and worker outputs.
-- Read the actual source files that were changed (infer from step summaries and artifacts) and verify they satisfy the goal.
-- Check input/output contracts, invariants, edge cases.
-- Look for lifecycle, restart, retry, recovery, idempotency, and state-transition issues when relevant.
-- Look for missing validation, hidden regressions, and contradictions between artifacts, summaries, and actual code.
+VERIFICATION PROCEDURE (mandatory -- do not skip any step):
+1. The job state below includes diff_summary and error_reason for each step. Use these to understand what changed and what failed.
+2. Open and read the artifact files listed in each step to inspect detailed engine build/test results and worker outputs. Do NOT rely solely on step summaries.
+3. Read the actual source files that were changed (use diff_summary to identify them) and verify they satisfy the goal.
+4. Check input/output contracts, invariants, edge cases.
+5. Look for lifecycle, restart, retry, recovery, idempotency, and state-transition issues when relevant.
+6. Look for missing validation, hidden regressions, and contradictions between artifacts, summaries, and actual code.
+7. Base your pass/fail decision on what you actually read, not on what the worker claimed.
 
 %s
 %s%s
@@ -730,11 +732,13 @@ func buildCompactReviewerPayload(job domain.Job, task domain.LeaderOutput) strin
 // Role profiles are included so the evaluator knows which models ran each role.
 func buildCompactEvaluatorPayload(job domain.Job) string {
 	type stepEvidence struct {
-		Index     int      `json:"index"`
-		TaskType  string   `json:"task_type"`
-		Status    string   `json:"status"`
-		Summary   string   `json:"summary,omitempty"`
-		Artifacts []string `json:"artifacts,omitempty"`
+		Index       int      `json:"index"`
+		TaskType    string   `json:"task_type"`
+		Status      string   `json:"status"`
+		Summary     string   `json:"summary,omitempty"`
+		DiffSummary string   `json:"diff_summary,omitempty"`
+		ErrorReason string   `json:"error_reason,omitempty"`
+		Artifacts   []string `json:"artifacts,omitempty"`
 	}
 	type compactPayload struct {
 		JobID        string              `json:"job_id,omitempty"`
@@ -752,11 +756,13 @@ func buildCompactEvaluatorPayload(job domain.Job) string {
 			summary = string([]rune(summary)[:500]) + "..."
 		}
 		steps = append(steps, stepEvidence{
-			Index:     s.Index,
-			TaskType:  s.TaskType,
-			Status:    string(s.Status),
-			Summary:   summary,
-			Artifacts: s.Artifacts,
+			Index:       s.Index,
+			TaskType:    s.TaskType,
+			Status:      string(s.Status),
+			Summary:     summary,
+			DiffSummary: s.DiffSummary,
+			ErrorReason: s.ErrorReason,
+			Artifacts:   s.Artifacts,
 		})
 	}
 	out := compactPayload{
