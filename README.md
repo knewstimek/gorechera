@@ -167,7 +167,7 @@ Example: executor=gpt-5.3-codex-spark, evaluator=claude-sonnet-4-6
 - role_overrides: per-role {provider, model} overrides
 - prompt_overrides: per-role prompt prepend (keys: director, executor, evaluator)
 - engine_build_cmd / engine_test_cmd: override build/test commands (default: go build/test)
-- Non-code projects: set engine commands to "true" to skip build/test
+- Non-code projects: set engine_build_cmd and engine_test_cmd to "true" (a no-op shell command that always succeeds) to skip engine build/test verification
 
 ### Presets
 See examples/role-profiles.sample.json for ready-made configurations.
