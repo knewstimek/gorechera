@@ -163,6 +163,9 @@ func run(ctx context.Context, service *orchestrator.Service, args []string) {
 	workspaceMode := fs.String("workspace-mode", string(domain.WorkspaceModeShared), "workspace mode: shared | isolated")
 	maxSteps := fs.Int("max-steps", 8, "maximum worker steps")
 	strictness := fs.String("strictness", "normal", "evaluator strictness level: strict | normal | lenient")
+	skipPlanning := fs.Bool("skip-planning", false, "skip planner LLM call; verification contract is built from -done criteria directly")
+	skipLeader := fs.Bool("skip-leader", false, "skip leader LLM loop; orchestrator drives executor->evaluator retries directly (lightest pipeline when combined with -skip-planning)")
+	maxEvalRetries := fs.Int("max-eval-retries", 0, "max evaluator retries in -skip-leader mode (default 3 when 0)")
 	fs.Parse(args)
 
 	if strings.TrimSpace(*goal) == "" {
@@ -185,6 +188,9 @@ func run(ctx context.Context, service *orchestrator.Service, args []string) {
 		RoleProfiles:    roleProfiles,
 		MaxSteps:        *maxSteps,
 		StrictnessLevel: *strictness,
+		SkipPlanning:    *skipPlanning,
+		SkipLeader:      *skipLeader,
+		MaxEvalRetries:  *maxEvalRetries,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -726,6 +732,9 @@ func usage() {
 	fmt.Println("  stop [-workspace DIR | -addr HOST:PORT] -- graceful shutdown of running serve")
 	fmt.Println("  serve/mcp block stale interrupted jobs by default; use -recover or -recover-jobs job1,job2 to resume explicitly.")
 	fmt.Println("  run accepts -workspace-mode shared|isolated; isolated creates a detached git worktree for the job.")
+	fmt.Println("  run -skip-planning: skip planner LLM; use -done criteria as verification contract directly.")
+	fmt.Println("  run -skip-leader:   skip leader LLM loop; orchestrator retries executor->evaluator up to -max-eval-retries (default 3).")
+	fmt.Println("  run -skip-planning -skip-leader: lightest pipeline -- executor + evaluator only, no director LLM calls.")
 }
 
 func loadRoleProfiles(path string, base domain.ProviderName) (domain.RoleProfiles, error) {
