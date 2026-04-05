@@ -1,5 +1,21 @@
 # Changelog
 
+## v2026.04.05
+
+### Added
+- **skip_planning flag**: skip planner LLM call when the goal and done_criteria are already precise. Verification contract is built directly from done_criteria. Saves one director call per job. `strictness_level=auto` falls back to `normal` when skip_planning is active.
+- **skip_leader flag**: skip leader LLM loop entirely. Orchestrator synthesizes executor tasks from job.Goal and drives executor->evaluator retries without any director LLM calls. Evaluator failure reasons (cumulative, capped at 3) are injected into each subsequent executor task_text so the executor can fix issues without regressing earlier corrections.
+- **max_eval_retries parameter**: controls how many executor->evaluator retry cycles are allowed in skip_leader mode (default 3). Separate from max_steps.
+- **Lightest pipeline**: skip_planning + skip_leader combined = executor + evaluator only. No director LLM calls at all. Optimal for chain-based porting/translation jobs where the supervisor owns decomposition and the test suite provides mechanical verification.
+- **CLI flags**: `-skip-planning`, `-skip-leader`, `-max-eval-retries` added to `gorchera run`.
+- **Validation**: skip_leader without skip_planning is rejected at job creation (incoherent combination -- planner output is unused when leader is skipped).
+
+### Evaluator retry behaviour (skip_leader mode)
+- `evaluator passed` -> job done
+- `evaluator blocked` -> job blocked immediately, no retry (dependency or external issue)
+- `evaluator failed` -> inject failure reason into next executor task_text, retry up to max_eval_retries
+- `max_steps reached` -> job blocked ("max_steps_exceeded")
+
 ## v2026.04.04.3
 
 ### Added
